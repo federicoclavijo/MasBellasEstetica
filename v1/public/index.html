@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>+Bellas · Reserva tu consulta</title>
+  <meta name="description" content="Reserva tu consulta en +Bellas, clínica estética. Elige el tipo de consulta, el horario y conoce al especialista que te atenderá.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500;1,600&family=DM+Sans:wght@400;500;600;700&display=swap">
+  <link rel="icon" type="image/svg+xml" href="img/favicon.svg">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="/" aria-label="+Bellas, inicio">
+      <span class="brand__plus" aria-hidden="true">+</span><span class="brand__name">Bellas</span>
+      <span class="brand__tag">Clínica estética</span>
+    </a>
+    <nav class="site-nav" aria-label="Principal">
+      <a href="/" aria-current="page">Reservar consulta</a>
+      <a href="nosotros.html">Nosotros</a>
+      <a class="admin-link" href="admin.html">Administración</a>
+    </nav>
+  </header>
+  <main class="container">
+    <section class="intro">
+      <h1>Reserva tu <em>consulta</em></h1>
+      <p>Elige el tipo de consulta que necesitas y el horario que mejor te quede; te atenderá el especialista a cargo. La consulta tiene un valor fijo de $500 que se abona online, de forma segura, con Mercado Pago. Si después decides realizar un tratamiento, lo coordinamos contigo en el local.</p>
+    </section>
+
+    <form id="form-reserva" class="layout" novalidate autocomplete="on">
+      <div class="form-steps">
+        <div id="aviso-carga" role="alert" hidden></div>
+
+        <section class="card" aria-labelledby="t-datos">
+          <div class="step"><span class="step__n" aria-hidden="true">1</span><h2 id="t-datos">Tus datos</h2></div>
+          <div class="field">
+            <label class="field__label" for="nombre">Nombre completo</label>
+            <input class="input" id="nombre" name="nombre" type="text" autocomplete="name" maxlength="80" required aria-describedby="err-nombre">
+            <p class="field__error" id="err-nombre"></p>
+          </div>
+          <div class="grid-2">
+            <div class="field">
+              <label class="field__label" for="cedula">Cédula de identidad</label>
+              <input class="input" id="cedula" name="cedula" type="text" inputmode="numeric" autocomplete="off" maxlength="14" required aria-describedby="hint-cedula err-cedula">
+              <p class="field__hint" id="hint-cedula">Con o sin puntos y guion.</p>
+              <p class="field__error" id="err-cedula"></p>
+            </div>
+            <div class="field">
+              <label class="field__label" for="email">Correo electrónico</label>
+              <input class="input" id="email" name="email" type="email" autocomplete="email" maxlength="120" required aria-describedby="err-email">
+              <p class="field__error" id="err-email"></p>
+            </div>
+          </div>
+          <div class="grid-2">
+            <div class="field">
+              <label class="field__label" for="telefono">Teléfono celular</label>
+              <input class="input" id="telefono" name="telefono" type="tel" inputmode="tel" autocomplete="tel" placeholder="099 123 456" maxlength="20" required aria-describedby="hint-telefono err-telefono">
+              <p class="field__hint" id="hint-telefono">Celular de Uruguay. Podemos contactarte por WhatsApp.</p>
+              <p class="field__error" id="err-telefono"></p>
+            </div>
+            <div class="field">
+              <label class="field__label" for="fechaNacimiento">Fecha de nacimiento</label>
+              <input class="input" id="fechaNacimiento" name="fechaNacimiento" type="date" autocomplete="bday" required aria-describedby="err-fechaNacimiento">
+              <p class="field__error" id="err-fechaNacimiento"></p>
+            </div>
+          </div>
+        </section>
+
+        <section class="card" aria-labelledby="t-servicio">
+          <div class="step"><span class="step__n" aria-hidden="true">2</span><h2 id="t-servicio">Tipo de consulta</h2></div>
+          <fieldset class="reset" style="border:0;margin:0;padding:0;min-width:0" aria-describedby="err-servicio">
+            <legend class="visually-hidden">Elige el tipo de consulta</legend>
+            <div id="lista-servicios" class="options" aria-live="polite"><p class="empty">Cargando consultas…</p></div>
+          </fieldset>
+          <p class="field__error" id="err-servicio"></p>
+        </section>
+
+        <section class="card" aria-labelledby="t-esp">
+          <div class="step"><span class="step__n" aria-hidden="true">3</span><h2 id="t-esp">Especialista a cargo</h2></div>
+          <p class="field__hint" id="hint-equipo" style="margin-bottom:.8rem">Cada consulta está a cargo de un especialista. Al elegir el tipo de consulta verás quién te atenderá.</p>
+          <ul id="lista-especialistas" class="team" aria-live="polite"><li class="empty">Cargando especialistas…</li></ul>
+        </section>
+
+        <section class="card" aria-labelledby="t-fecha">
+          <div class="step"><span class="step__n" aria-hidden="true">4</span><h2 id="t-fecha">Fecha y horario</h2></div>
+          <div class="field">
+            <label class="field__label" for="fecha">Fecha</label>
+            <input class="input" id="fecha" name="fecha" type="date" required aria-describedby="err-fecha" style="max-width:15rem">
+            <p class="field__error" id="err-fecha"></p>
+          </div>
+          <div id="fechas-sugeridas" class="fechas-sugeridas" aria-live="polite"></div>
+          <fieldset style="border:0;margin:0;padding:0;min-width:0" aria-describedby="hint-horario err-hora">
+            <legend class="field__label" style="padding:0;margin-bottom:.5rem">Horario de inicio</legend>
+            <div id="lista-horas" class="slots"></div>
+            <p class="field__hint" id="hint-horario" style="margin-top:.6rem">Atendemos de 08:00 a 20:00. Elige un único horario.</p>
+            <p class="field__error" id="err-hora"></p>
+          </fieldset>
+          <div class="notice notice--info" role="note">
+            <span class="notice__icon" aria-hidden="true">ⓘ</span>
+            <span>Las consultas duran 30 minutos. Los horarios mostrados son los disponibles para la consulta y la fecha elegidas; pueden cambiar hasta que completes la reserva.</span>
+          </div>
+        </section>
+      </div>
+
+      <aside class="card summary" aria-labelledby="t-resumen">
+        <h2 id="t-resumen">Resumen</h2>
+        <dl id="resumen">
+          <div class="summary__row"><dt>Cliente</dt><dd data-r="nombre"></dd></div>
+          <div class="summary__row"><dt>Cédula</dt><dd data-r="cedula"></dd></div>
+          <div class="summary__row"><dt>Correo</dt><dd data-r="email"></dd></div>
+          <div class="summary__row"><dt>Teléfono</dt><dd data-r="telefono"></dd></div>
+          <div class="summary__row"><dt>Nacimiento</dt><dd data-r="fechaNacimiento"></dd></div>
+          <div class="summary__row"><dt>Consulta</dt><dd data-r="servicio"></dd></div>
+          <div class="summary__row"><dt>Especialista</dt><dd data-r="especialista"></dd></div>
+          <div class="summary__row"><dt>Fecha</dt><dd data-r="fecha"></dd></div>
+          <div class="summary__row"><dt>Hora</dt><dd data-r="hora"></dd></div>
+        </dl>
+        <div class="summary__total">
+          <span id="lbl-sena">Valor de la consulta</span>
+          <strong id="r-sena" aria-labelledby="lbl-sena">—</strong>
+        </div>
+        <p class="summary__legal" id="nota-sena"></p>
+        <div id="error-envio" role="alert" hidden></div>
+        <div class="field terms-check">
+          <label class="check" for="terminos">
+            <input type="checkbox" id="terminos" name="terminos" required aria-describedby="err-terminos">
+            <span>He leído y acepto los <a href="terminos.html" target="_blank" rel="noopener">términos y condiciones</a>, incluida la política de asistencia y devolución.</span>
+          </label>
+          <p class="field__error" id="err-terminos"></p>
+        </div>
+        <button class="btn btn--primary btn--block" type="submit" id="btn-enviar">Reservar y pagar consulta</button>
+        <p class="summary__legal">Serás redirigido a Mercado Pago para completar el pago. La reserva se confirma cuando el pago es acreditado. Si no asistes a la consulta, el importe no se devuelve.</p>
+      </aside>
+    </form>
+  </main>
+
+  <footer class="site-footer">
+    <div class="site-footer__inner">
+      <div>
+        <a class="brand" href="/" aria-label="+Bellas, inicio"><span class="brand__plus" aria-hidden="true">+</span><span class="brand__name">Bellas</span></a>
+        <p style="margin-top:.7rem;max-width:22rem">Clínica estética dedicada a cuidar tu piel y tu bienestar con atención profesional y cercana.</p>
+      </div>
+      <!-- EDITAR: reemplaza estos datos de contacto por los reales -->
+      <div>
+        <h3>Contacto</h3>
+        <ul>
+          <li>Montevideo, Uruguay</li>
+          <li>WhatsApp: +598 99 000 000</li>
+          <li>info@masbellas.example</li>
+        </ul>
+      </div>
+      <div>
+        <h3>Horario</h3>
+        <ul>
+          <li>Lunes a sábado, de 08:00 a 20:00</li>
+          <li>Atención con reserva previa</li>
+        </ul>
+      </div>
+      <p class="site-footer__copy">© +Bellas · Todos los derechos reservados. · <a href="terminos.html">Términos y condiciones</a></p>
+    </div>
+  </footer>
+
+  <script type="module" src="js/booking.js"></script>
+</body>
+</html>

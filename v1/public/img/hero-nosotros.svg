@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 760" role="img" aria-labelledby="t"><title id="t">Ilustración de una flor de loto dorada frente a un arco rosado</title>
+<defs>
+<linearGradient id="rosa" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff4f7"/><stop offset=".55" stop-color="#fbd9e4"/><stop offset="1" stop-color="#f3b4c8"/></linearGradient>
+<linearGradient id="oro" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f0d68e"/><stop offset=".55" stop-color="#c6993f"/><stop offset="1" stop-color="#a87c24"/></linearGradient>
+<linearGradient id="petalo" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#fde3ec"/></linearGradient>
+<radialGradient id="halo" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#fff" stop-opacity=".9"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
+</defs>
+<rect width="800" height="760" fill="#fffafb"/>
+<path d="M110 730V340a290 290 0 0 1 580 0v390z" fill="url(#rosa)" stroke="#c6993f" stroke-width="3"/>
+<path d="M150 730V340a250 250 0 0 1 500 0v390" fill="none" stroke="#e8d29a" stroke-width="2" stroke-dasharray="4 8"/>
+<circle cx="400" cy="300" r="170" fill="url(#halo)"/>
+<circle cx="400" cy="300" r="92" fill="url(#oro)" opacity=".92"/>
+<g fill="none" stroke="#c6993f" stroke-width="2.5" stroke-linecap="round">
+<path d="M400 150v-34M400 484v-34M250 300h-34M584 300h-34M294 194l-24-24M530 430l-24-24M506 194l24-24M294 406l-24 24" opacity=".0"/>
+<path d="M255 640c40-6 74-22 102-56M545 640c-40-6-74-22-102-56"/>
+</g>
+<g fill="#e9b6c7" opacity=".85"><path d="M150 560c60-70 120-86 170-70-20 60-80 90-170 70z"/><path d="M650 560c-60-70-120-86-170-70 20 60 80 90 170 70z"/></g>
+<g fill="none" stroke="#c6993f" stroke-width="2"><path d="M165 548c36-36 78-52 132-54M635 548c-36-36-78-52-132-54"/></g>
+<g stroke="#c6993f" stroke-width="2.5" fill="url(#petalo)">
+<g transform="rotate(-62 400 600)"><ellipse cx="400" cy="508" rx="38" ry="98"/></g>
+<g transform="rotate(62 400 600)"><ellipse cx="400" cy="508" rx="38" ry="98"/></g>
+<g transform="rotate(-32 400 600)"><ellipse cx="400" cy="498" rx="42" ry="108"/></g>
+<g transform="rotate(32 400 600)"><ellipse cx="400" cy="498" rx="42" ry="108"/></g>
+<ellipse cx="400" cy="488" rx="46" ry="118"/>
+</g>
+<path d="M400 410c-14 36-14 80 0 120" fill="none" stroke="#e8d29a" stroke-width="2"/>
+<g fill="none" stroke="#c6993f" stroke-width="2.5" stroke-linecap="round"><path d="M250 668q38-14 76 0t76 0 76 0 76 0"/><path d="M290 700q30-10 60 0t60 0 60 0 60 0" opacity=".6"/></g>
+<g fill="url(#oro)"><path d="M610 200l9 24 24 9-24 9-9 24-9-24-24-9 24-9z"/><path d="M180 250l6 16 16 6-16 6-6 16-6-16-16-6 16-6z"/><path d="M640 400l5 12 12 5-12 5-5 12-5-12-12-5 12-5z"/></g>
+</svg>

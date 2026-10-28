@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 560" role="img" aria-labelledby="t"><title id="t">Ilustración de un ambiente luminoso con espejo dorado, arco y plantas</title>
+<defs>
+<linearGradient id="pared" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff7f9"/><stop offset="1" stop-color="#fbdfe8"/></linearGradient>
+<linearGradient id="oro" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f0d68e"/><stop offset=".55" stop-color="#c6993f"/><stop offset="1" stop-color="#a87c24"/></linearGradient>
+<linearGradient id="luz" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fffdf4"/><stop offset="1" stop-color="#fbeed2"/></linearGradient>
+</defs>
+<rect width="800" height="560" fill="url(#pared)"/>
+<rect y="470" width="800" height="90" fill="#f6d4df"/><rect y="466" width="800" height="6" fill="url(#oro)"/>
+<path d="M90 470V210a110 110 0 0 1 220 0v260z" fill="url(#luz)" stroke="#c6993f" stroke-width="3"/>
+<path d="M200 100v370M90 270h220" stroke="#e8d29a" stroke-width="2"/>
+<circle cx="200" cy="205" r="50" fill="#f7dfa0" opacity=".55"/>
+<circle cx="520" cy="215" r="125" fill="#fff" stroke="url(#oro)" stroke-width="12"/>
+<circle cx="520" cy="215" r="108" fill="#fdeaf0"/>
+<path d="M440 160c40-30 100-34 150 0" fill="none" stroke="#fff" stroke-width="10" stroke-linecap="round" opacity=".8"/>
+<rect x="445" y="360" width="150" height="14" rx="7" fill="url(#oro)"/><rect x="465" y="374" width="10" height="96" fill="#c6993f"/><rect x="565" y="374" width="10" height="96" fill="#c6993f"/>
+<g><path d="M380 470l12-86h56l12 86z" fill="#fff" stroke="#c6993f" stroke-width="3"/><g fill="none" stroke="#b9855a" stroke-width="0"/>
+<g stroke="#c6993f" stroke-width="3" fill="none" stroke-linecap="round"><path d="M420 384c-4-60-30-110-70-150M420 384c6-70 36-120 84-160M420 384c-2-50 6-100 22-150"/></g>
+<g fill="#f0b9cb" stroke="#c6993f" stroke-width="2"><ellipse cx="352" cy="240" rx="16" ry="34" transform="rotate(-34 352 240)"/><ellipse cx="500" cy="232" rx="16" ry="34" transform="rotate(34 500 232)"/><ellipse cx="444" cy="188" rx="15" ry="36" transform="rotate(8 444 188)"/><ellipse cx="388" cy="300" rx="14" ry="30" transform="rotate(-20 388 300)"/></g></g>
+<g><path d="M690 470l-8-70h66l-8 70z" fill="#fff" stroke="#c6993f" stroke-width="3"/><g fill="#f4c6d5" stroke="#c6993f" stroke-width="2"><ellipse cx="716" cy="350" rx="20" ry="52"/><ellipse cx="690" cy="372" rx="16" ry="42" transform="rotate(-28 690 372)"/><ellipse cx="744" cy="372" rx="16" ry="42" transform="rotate(28 744 372)"/></g></g>
+<g fill="url(#oro)"><path d="M640 90l8 22 22 8-22 8-8 22-8-22-22-8 22-8z"/><path d="M60 80l6 16 16 6-16 6-6 16-6-16-16-6 16-6z"/></g>
+</svg>
