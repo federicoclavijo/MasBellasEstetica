@@ -3,7 +3,7 @@
 import * as api from "./api.js";
 import { ApiError, sesion } from "./api.js";
 import {
-  el, $, vaciar, toast, setCargando, abrirDialogo, confirmar, formatearMoneda, formatearFechaCorta, hoyISO, iniciales, normalizarTelefonoUY, formatearTelefonoUY, formatearCedulaUY,
+  el, $, vaciar, toast, setCargando, abrirDialogo, confirmar, formatearMoneda, formatearFechaCorta, hoyISO, fotoPerfil, iniciales, normalizarTelefonoUY, formatearTelefonoUY, formatearCedulaUY,
   DIAS_ABREV, DIAS_SEMANA, DIAS_POR_DEFECTO, diasDe, textoDias, sugerirFechas,
 } from "./ui.js";
 
@@ -14,7 +14,8 @@ const contenido = $("#panel-contenido");
 const estado = {
   seccion: "reservas",
   reservas: [], servicios: [], especialistas: [],
-  filtros: { texto: "", estadoReserva: "", estadoPago: "", asistencia: "", fecha: "", orden: "fecha_desc" },
+  filtros: { texto: "", tipo: "", estadoReserva: "", estadoPago: "", asistencia: "", fecha: "", orden: "fecha_desc" },
+  filtroServicios: { texto: "", tipo: "" }, // tipo: "" (todos) | "consulta" | "tratamiento"
 };
 
 // --- Sesión ---------------------------------------------------------------------------
@@ -312,10 +313,11 @@ function celdaImporte(r) {
 }
 
 function reservasFiltradas() {
-  const { texto, estadoReserva, estadoPago, asistencia, fecha, orden } = estado.filtros;
+  const { texto, tipo, estadoReserva, estadoPago, asistencia, fecha, orden } = estado.filtros;
   const q = texto.trim().toLowerCase();
   const lista = estado.reservas.filter((r) =>
     (!q || [r.nombre, r.cedula, r.email, r.telefono, servicioDe(r), especialistaDe(r)].some((v) => String(v).toLowerCase().includes(q)))
+    && (!tipo || tipoDe(r) === tipo)
     && (!estadoReserva || r.estadoReserva === estadoReserva)
     && (!estadoPago || r.estadoPago === estadoPago)
     && (!asistencia || asistenciaDe(r) === asistencia)
@@ -373,6 +375,7 @@ function pintarReservas() {
     cabecera("Reservas", "", { texto: "Nuevo tratamiento", onclick: nuevaReservaTratamientoUI }),
     el("div", { class: "toolbar" },
       campo("Buscar", el("input", { class: "input", type: "search", placeholder: "Buscar cliente, correo, teléfono…", "aria-label": "Buscar reservas", value: f.texto, oninput: (e) => { f.texto = e.target.value; repintarLista(); } })),
+      select("Tipo de reserva", "tipo", [["", "Consultas y tratamientos"], ["consulta", "Solo consultas"], ["tratamiento", "Solo tratamientos"]]),
       select("Estado de la reserva", "estadoReserva", [["", "Toda reserva"], ...Object.entries({ pendiente_pago: "Pendiente de pago", confirmada: "Confirmada", cancelada: "Cancelada", expirada: "Expirada" })]),
       select("Asistencia", "asistencia", [["", "Toda asistencia"], ["asistio", "Asistió"], ["no_asistio", "No asistió"], ["sin_registrar", "Sin registrar"]]),
       select("Estado del pago", "estadoPago", [["", "Todo pago"], ["pendiente", "Pendiente"], ["aprobado", "Aprobado"], ["rechazado", "Rechazado"], ["reembolsado", "Reembolsado"]]),
@@ -717,7 +720,7 @@ function pintarEspecialistas() {
     estado.especialistas.length
       ? el("div", { class: "cards" }, estado.especialistas.map((e) => el("article", { class: "card person" },
           el("div", { class: "person__top" },
-            e.imagenPerfil ? el("img", { class: "avatar", src: e.imagenPerfil, alt: `Foto de ${e.nombre}`, loading: "lazy" }) : el("span", { class: "avatar", "aria-hidden": "true" }, iniciales(e.nombre)),
+            e.imagenPerfil ? el("img", { class: "avatar", src: fotoPerfil(e.imagenPerfil, 80), alt: `Foto de ${e.nombre}`, width: 80, height: 80, loading: "lazy", decoding: "async" }) : el("span", { class: "avatar", "aria-hidden": "true" }, iniciales(e.nombre)),
             el("div", {}, el("h2", {}, e.nombre), el("span", { class: "badge" }, ROLES.find((r) => r.value === e.rol)?.label || e.rol || "—"))),
           el("div", { class: "person__dias" },
             el("small", { class: "sub" }, `Atiende: ${textoDias(diasDe(e))}`),
@@ -725,7 +728,7 @@ function pintarEspecialistas() {
               ORDEN_DIAS.map((d) => el("span", { class: `dia-pill${diasDe(e).includes(d) ? " is-on" : ""}`, "aria-hidden": "true", title: DIAS_SEMANA[d] }, DIAS_ABREV[d].slice(0, 1))))),
           el("p", { class: "person__servicios" },
             el("small", { class: "sub" }, (e.servicios?.length ?? 0) === 0 ? "Sin servicios asignados" : `Servicios (${e.servicios.length})`),
-            (e.servicios ?? []).length ? el("span", {}, e.servicios.map((x) => x.nombre).join(" · ")) : null),
+            (e.servicios ?? []).length ? el("span", {}, e.servicios.map((x) => `${x.nombre} (${x.porcentaje === false ? "consulta" : "tratamiento"})`).join(" · ")) : null),
           el("div", { class: "person__actions" },
             botonFila("Modificar", `Modificar ${e.nombre}`, () => modificarEspecialistaUI(e)),
             botonFila("Eliminar", `Eliminar ${e.nombre}`, () => eliminarEspecialistaUI(e))))))
@@ -736,7 +739,8 @@ function pintarEspecialistas() {
 // Servicios que puede tener a cargo: todos; se avisa cuál tiene hoy otro especialista (al marcarlo se le quita).
 const opcionesServicios = (especialistaId) => estado.servicios.map((s) => {
   const otro = s.especialistaId && s.especialistaId !== especialistaId ? nombreDe(estado.especialistas, s.especialistaId) : null;
-  return { value: s._id, label: s.nombre, nota: otro ? `Hoy a cargo de ${otro}` : null };
+  // Una consulta y un tratamiento pueden llamarse igual: se indica el tipo para distinguirlos.
+  return { value: s._id, label: `${s.nombre} (${s.esConsulta ? "consulta" : "tratamiento"})`, nota: otro ? `Hoy a cargo de ${otro}` : null };
 });
 
 const camposEspecialista = (especialistaId) => [
@@ -792,11 +796,27 @@ const eliminarEspecialistaUI = (e) => {
 };
 
 // --- Servicios -----------------------------------------------------------------------------------------------
+const etiquetaTipo = (s) => (s.esConsulta ? "Consulta" : "Tratamiento");
+
+function serviciosFiltrados() {
+  const { texto, tipo } = estado.filtroServicios;
+  const q = texto.trim().toLowerCase();
+  return estado.servicios.filter((s) =>
+    (!q || String(s.nombre).toLowerCase().includes(q) || String(nombreDe(estado.especialistas, s.especialistaId) ?? "").toLowerCase().includes(q))
+    && (!tipo || (tipo === "consulta") === Boolean(s.esConsulta)));
+}
+
 function pintarServicios() {
-  vaciar(contenido).append(
-    cabecera("Servicios", `${estado.servicios.length} en total`, { texto: "Nuevo servicio", onclick: nuevoServicioUI }),
-    tabla(["Servicio", "Tipo y precio", "Cobro al reservar", "Especialista", "Estado", "Acciones"],
-      estado.servicios.map((s) => [
+  const f = estado.filtroServicios;
+  const campo = (etiqueta, control) => el("div", { class: "field", style: "margin:0" }, el("label", { class: "visually-hidden" }, etiqueta), control);
+  const lista = el("div", { id: "lista-servicios" });
+  const conteo = el("span", { class: "panel__count" });
+
+  function repintarLista() {
+    const filas = serviciosFiltrados();
+    conteo.textContent = `${filas.length} de ${estado.servicios.length}`;
+    vaciar(lista).append(tabla(["Servicio", "Tipo y precio", "Cobro al reservar", "Especialista", "Estado", "Acciones"],
+      filas.map((s) => [
         el("strong", {}, s.nombre),
         el("span", {}, s.esConsulta ? "Consulta · 30 min" : "Tratamiento · 1 h",
           el("small", { class: "sub" }, s.esConsulta ? formatearMoneda(s.precio) : (s.precio ? `Referencia ${formatearMoneda(s.precio)}` : "Precio a medida"))),
@@ -804,11 +824,22 @@ function pintarServicios() {
         nombreDe(estado.especialistas, s.especialistaId) || el("span", { class: "badge badge--warn" }, "Sin asignar"),
         el("span", { class: `badge ${s.activo ? "badge--ok" : ""}` }, s.activo ? "Activo" : "Inactivo"),
         acciones(
-          botonFila("Modificar", `Modificar ${s.nombre}`, () => modificarServicioUI(s)),
-          botonFila("Eliminar", `Eliminar ${s.nombre}`, () => eliminarServicioUI(s))),
+          botonFila("Modificar", `Modificar ${etiquetaTipo(s).toLowerCase()} ${s.nombre}`, () => modificarServicioUI(s)),
+          botonFila("Eliminar", `Eliminar ${etiquetaTipo(s).toLowerCase()} ${s.nombre}`, () => eliminarServicioUI(s))),
       ]),
-      "Todavía no hay servicios registrados."),
+      estado.servicios.length ? "No hay servicios que coincidan." : "Todavía no hay servicios registrados.",
+    ));
+  }
+
+  vaciar(contenido).append(
+    cabecera("Servicios", "", { texto: "Nuevo servicio", onclick: nuevoServicioUI }),
+    estado.servicios.length ? el("div", { class: "toolbar toolbar--servicios" },
+      campo("Buscar", el("input", { class: "input", type: "search", placeholder: "Buscar servicio o especialista…", "aria-label": "Buscar servicios", value: f.texto, oninput: (e) => { f.texto = e.target.value; repintarLista(); } })),
+      campo("Tipo de servicio", el("select", { class: "input", "aria-label": "Filtrar servicios por tipo", onchange: (e) => { f.tipo = e.target.value; repintarLista(); } },
+        [["", "Consultas y tratamientos"], ["consulta", "Solo consultas"], ["tratamiento", "Solo tratamientos"]].map(([v, t]) => el("option", { value: v, selected: f.tipo === v }, t))))) : null,
+    conteo, lista,
   );
+  repintarLista();
 }
 
 // Cualquier especialista puede tener varios servicios; también se puede dejar el servicio "Sin asignar".
@@ -856,7 +887,7 @@ const modificarServicioUI = (s) => formulario({
 
 const eliminarServicioUI = (s) => accionConfirmada({
   titulo: "Eliminar servicio",
-  mensaje: `¿Eliminar el servicio «${s.nombre}»? Su especialista quedará libre. Si solo quieres que no reciba nuevas reservas, desactívalo desde «Modificar».`,
+  mensaje: `¿Eliminar ${s.esConsulta ? "la consulta" : "el tratamiento"} «${s.nombre}»? Su especialista quedará libre. Si solo quieres que no reciba nuevas reservas, desactívalo desde «Modificar».`,
   ejecutar: () => api.eliminarServicio(s._id),
   exito: "Servicio eliminado.",
 });

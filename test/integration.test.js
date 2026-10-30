@@ -167,17 +167,97 @@ test("índices: un índice único viejo (p. ej. sobre el precio) bloquea guardad
     const eliminados = await M.indices.eliminarIndicesUnicosObsoletos();
     assert.deepEqual(eliminados.sort(), ["especialistas.servicioId_1", "servicios.precio_1"]);
     const quedan = (await M.Servicio.collection.indexes()).map((i) => i.name);
-    assert.ok(quedan.includes("nombre_1"), "el índice único de nombre se conserva");
+    assert.ok(quedan.includes("nombre_1_porcentaje_1"), "se conserva el índice único por nombre + tipo");
     assert.deepEqual(await M.indices.eliminarIndicesUnicosObsoletos(), []); // idempotente
 
     assert.equal((await nuevaConsulta("Consulta B (mismo precio)")).status, 201);
     assert.equal((await nuevaConsulta("Consulta C (mismo precio)")).status, 201);
     assert.equal((await admin("POST", "/servicios", { nombre: "Tratamiento X", precio: 500, especialistaId: temporal })).status, 201);   // también tratamientos con igual precio
     assert.equal((await admin("POST", "/especialistas", { nombre: "Sin servicio 2" })).status, 201);
-    assert.equal((await nuevaConsulta("consulta b (MISMO precio)")).status, 409);   // el nombre sí sigue siendo único
+    assert.equal((await nuevaConsulta("consulta b (MISMO precio)")).status, 409);   // el nombre sigue siendo único dentro de las consultas
     // se retiran los datos de esta prueba para no alterar las demás
     await M.Servicio.deleteMany({});
     await M.Especialista.deleteMany({ nombre: /^(Sin servicio|Temporal de índices)/ });
+});
+
+test("nombres: una consulta y un tratamiento pueden llamarse igual, pero no hay 2 consultas ni 2 tratamientos con el mismo nombre", { skip: omitir }, async () => {
+    const esp = (await admin("POST", "/especialistas", { nombre: "Temporal de nombres" })).data.especialista._id;
+    await M.Servicio.deleteMany({});
+    // Base creada con la versión anterior: índice único solo sobre `nombre` (impedía «Botox» consulta + «Botox» tratamiento).
+    await M.Servicio.collection.createIndex({ nombre: 1 }, { unique: true, name: "nombre_1" });
+    assert.deepEqual(await M.indices.eliminarIndicesUnicosObsoletos(), ["servicios.nombre_1"]);
+    await M.Servicio.init();
+
+    const consulta = (nombre) => admin("POST", "/servicios", { nombre, esConsulta: true, especialistaId: esp });
+    const tratamiento = (nombre) => admin("POST", "/servicios", { nombre, esConsulta: false, especialistaId: esp });
+
+    const c = await consulta("Botox");
+    const t = await tratamiento("Botox");
+    assert.equal(c.status, 201);
+    assert.equal(t.status, 201);                                   // mismo nombre, tipos distintos
+    assert.equal((await consulta("botox")).status, 409);           // 2.ª consulta con ese nombre (sin distinguir mayúsculas)
+    assert.match((await consulta("BOTOX")).data.mensaje, /Ya existe una consulta/);
+    assert.equal((await tratamiento("Botox")).status, 409);        // 2.º tratamiento con ese nombre
+    assert.match((await tratamiento(" Botox ")).data.mensaje, /Ya existe un tratamiento/);
+
+    // Renombrar / cambiar de tipo también respeta la regla.
+    const otra = (await consulta("Relleno")).data.servicio._id;
+    assert.equal((await admin("PATCH", `/servicios/${otra}`, { nombre: "Botox" })).status, 409);                   // choca con la consulta «Botox»
+    assert.equal((await admin("PATCH", `/servicios/${otra}`, { esConsulta: false })).status, 200);                 // «Relleno» pasa a tratamiento (no hay otro)
+    assert.equal((await admin("PATCH", `/servicios/${otra}`, { nombre: "Botox" })).status, 409);                   // choca con el tratamiento «Botox»
+    await consulta("Relleno");                                                                                     // vuelve a existir una consulta «Relleno»
+    assert.equal((await admin("PATCH", `/servicios/${otra}`, { esConsulta: true })).status, 409);                  // dos consultas «Relleno»
+    assert.equal((await admin("PATCH", `/servicios/${t.data.servicio._id}`, { precio: 4000 })).status, 200);       // editar otros campos no choca consigo mismo
+
+    // El público solo ve la consulta; el panel ve las dos.
+    const publicas = (await api("GET", "/servicios")).data.servicios.filter((x) => x.nombre === "Botox");
+    assert.equal(publicas.length, 1);
+    assert.equal(publicas[0].esConsulta, true);
+    assert.equal((await admin("GET", "/servicios?todos=true")).data.servicios.filter((x) => x.nombre === "Botox").length, 2);
+
+    await M.Servicio.deleteMany({});
+    await M.Especialista.deleteMany({ nombre: "Temporal de nombres" });
+});
+
+test("antelación: el cliente no puede reservar con menos de 24 h; el administrador sí agenda sin ese margen", { skip: omitir }, async () => {
+    const esp = (await admin("POST", "/especialistas", { nombre: "Temporal de antelación", diasDisponibles: [0, 1, 2, 3, 4, 5, 6] })).data.especialista._id;
+    const consulta = (await admin("POST", "/servicios", { nombre: "Consulta antelación", esConsulta: true, especialistaId: esp })).data.servicio._id;
+    const trat = (await admin("POST", "/servicios", { nombre: "Tratamiento antelación", esConsulta: false, especialistaId: esp })).data.servicio._id;
+    const ahora = util.ahoraNegocio();
+
+    // Primer turno de consulta (cada 30 min) que ya cumple las 24 h, y el anterior (que todavía no).
+    const horas = util.generarFranjas(30);
+    const cumple = (fecha, h) => !util.sinAntelacionMinima(fecha, h, 24, ahora);
+    const manana = dias(1);
+    const primero = horas.find((h) => cumple(manana, h));
+    const anterior = horas[horas.indexOf(primero) - 1];
+
+    // Hoy nunca alcanza: siempre es menos de 24 h.
+    const hoyHora = horas.find((h) => !util.franjaYaPaso(hoy(), h, ahora)) ?? horas.at(-1);
+    const hoyResp = await api("POST", "/reservas", { body: { ...datosCliente({ email: "antelacion-hoy@correo.com" }), servicioId: consulta, fecha: hoy(), hora: hoyHora } });
+    assert.equal(hoyResp.status, 400);
+
+    if (anterior) {
+        const corta = await api("POST", "/reservas", { body: { ...datosCliente({ email: "antelacion-corta@correo.com" }), servicioId: consulta, fecha: manana, hora: anterior } });
+        assert.equal(corta.status, 400);
+        assert.match(corta.data.mensaje, /24 horas de antelación/);
+    }
+
+    // La disponibilidad pública no ofrece turnos de menos de 24 h; la del administrador sí.
+    const publica = (await api("GET", `/reservas/disponibilidad?fecha=${manana}&servicioId=${consulta}`)).data;
+    assert.ok(publica.horariosDisponibles.every((h) => cumple(manana, h)), "la web no ofrece horarios dentro de las próximas 24 h");
+    if (primero) assert.ok(publica.horariosDisponibles.includes(primero));
+    const hoyPublica = (await api("GET", `/reservas/disponibilidad?fecha=${hoy()}&servicioId=${consulta}`)).data;
+    assert.deepEqual(hoyPublica.horariosDisponibles, []);
+
+    if (primero) {
+        const ok = await api("POST", "/reservas", { body: { ...datosCliente({ email: "antelacion-ok@correo.com" }), servicioId: consulta, fecha: manana, hora: primero } });
+        assert.equal(ok.status, 201);
+    }
+
+    // El administrador agenda un tratamiento para mañana sin la restricción (si el horario todavía no pasó).
+    const mananaAdmin = await admin("POST", "/reservas/admin", { nombre: "Clienta Tratamiento", telefono: "098 765 432", email: "antelacion-admin@correo.com", servicioId: trat, fecha: manana, hora: "08:00", precio: 3000 });
+    assert.equal(mananaAdmin.status, 201);
 });
 
 test("catálogo: un especialista con varias consultas; consultas fijas en $500; tratamientos con precio opcional", { skip: omitir }, async () => {
@@ -554,7 +634,7 @@ test("correo de confirmación: se envía una sola vez cuando Mercado Pago avisa 
 
 test("días de atención: por defecto lunes a sábado, editables, y coherentes en formulario público, panel y reprogramación", { skip: omitir }, async () => {
     // Próxima fecha (desde mañana) que cae en el día de la semana indicado (0 = domingo … 6 = sábado).
-    const proximo = (dia, desde = 1) => { let n = desde; while (util.diaSemana(dias(n)) !== dia) n++; return dias(n); };
+    const proximo = (dia, desde = 2) => { let n = desde; while (util.diaSemana(dias(n)) !== dia) n++; return dias(n); };
 
     // Valor por defecto: lunes a sábado (nunca domingo)
     const sab = (await admin("POST", "/especialistas", { nombre: "Dra. Solo Sábados", diasDisponibles: [6] })).data.especialista;

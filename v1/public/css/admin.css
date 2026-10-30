@@ -23,9 +23,9 @@
 .tabs { display: flex; gap: .25rem; background: var(--beige); padding: .25rem; border-radius: 999px; order: 3; width: 100%; overflow-x: auto; }
 @media (min-width: 46rem) { .tabs { order: 0; width: auto; } }
 .tab {
-  flex: 1 0 auto; min-height: 2.4rem; padding: .3rem 1rem; border: 0; border-radius: 999px; background: transparent;
+  flex: 1 0 auto; min-height: 2.4rem; padding: .3rem 1rem; border: 0; border-radius: 999px; background-color: rgba(255, 255, 255, 0);
   color: var(--muted); font-weight: 600; cursor: pointer; white-space: nowrap;
-  transition: color .2s ease, background .2s ease, box-shadow .2s ease;
+  transition: color .2s ease, background-color .2s ease, box-shadow .2s ease;
 }
 .tab:hover { color: var(--ink); background: rgba(255, 255, 255, .6); }
 .tab[aria-current="page"] { background: var(--paper); color: var(--rose-strong); box-shadow: var(--shadow-sm), inset 0 -2px 0 var(--gold); }
@@ -38,7 +38,9 @@
 
 .toolbar { display: grid; gap: .6rem; grid-template-columns: 1fr; margin-bottom: 1rem; }
 @media (min-width: 40rem) { .toolbar { grid-template-columns: repeat(2, 1fr); } }
-@media (min-width: 64rem) { .toolbar { grid-template-columns: 2fr repeat(5, 1fr); } }
+@media (min-width: 64rem) { .toolbar { grid-template-columns: 2fr repeat(6, 1fr); } }
+.toolbar--servicios { grid-template-columns: 1fr; }
+@media (min-width: 40rem) { .toolbar--servicios { grid-template-columns: 2fr 1fr; } }
 
 /* Tablas: ancho cómodo en escritorio, scroll horizontal (nunca recorte) si no entran, y tarjetas en móvil */
 .panel.container { max-width: 90rem; }
@@ -82,7 +84,7 @@ table.data { width: 100%; border-collapse: collapse; }
 .cards { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr)); }
 .person { display: flex; flex-direction: column; gap: .9rem; }
 .person__top { display: flex; align-items: center; gap: .9rem; }
-.person .avatar { width: 3.6rem; height: 3.6rem; font-size: 1.1rem; }
+.person .avatar { width: 5rem; height: 5rem; font-size: 1.4rem; border: 2px solid var(--gold-line); }
 .person h2 { font-size: 1.4rem; overflow-wrap: anywhere; }
 .person__actions { display: flex; gap: .5rem; flex-wrap: wrap; }
 

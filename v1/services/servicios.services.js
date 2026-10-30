@@ -17,8 +17,12 @@ const validarId = (id, texto = "El id") => {
 
 const escapar = (texto) => texto.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-const existeNombre = async (nombre, excluirId) => {
-    const filtro = { nombre: new RegExp(`^${escapar(nombre.trim())}$`, "i") };
+const errorDuplicado = (esConsulta) => crearError(409, esConsulta ? "Ya existe una consulta con ese nombre" : "Ya existe un tratamiento con ese nombre");
+
+// El nombre es único DENTRO de cada tipo: una consulta y un tratamiento pueden llamarse igual,
+// pero no puede haber 2 consultas ni 2 tratamientos con el mismo nombre.
+const existeNombre = async (nombre, esConsulta, excluirId) => {
+    const filtro = { nombre: new RegExp(`^${escapar(nombre.trim())}$`, "i"), porcentaje: !esConsulta };
     if (excluirId) filtro._id = { $ne: excluirId };
     return Servicio.exists(filtro);
 };
@@ -65,8 +69,8 @@ export const obtenerServicioPorIdService = async (id) => {
 export const guardarServicioService = async ({ nombre, precio, activo = true, esConsulta = false, especialistaId = null }) => {
     nombre = nombre.trim();
 
-    if (await existeNombre(nombre)) {
-        throw crearError(409, "Ya existe un servicio con ese nombre");
+    if (await existeNombre(nombre, esConsulta)) {
+        throw errorDuplicado(esConsulta);
     }
 
     const especialista = especialistaId ? await obtenerEspecialistaExistente(especialistaId) : null;
@@ -85,12 +89,16 @@ export const actualizarServicioService = async (id, cambios) => {
 
     const nombre = cambios.nombre?.trim();
 
-    if (nombre !== undefined && nombre !== servicio.nombre && await existeNombre(nombre, servicio._id)) {
-        throw crearError(409, "Ya existe un servicio con ese nombre");
-    }
-
     // Tipo: consulta (valor fijo, turnos de 30 min) o tratamiento (seña 50 %, turnos de 60 min).
     const cambiaTipo = cambios.esConsulta !== undefined && cambios.esConsulta !== (servicio.porcentaje === false);
+
+    // La unicidad es por (nombre + tipo): se valida con el nombre y el tipo que quedarían después del cambio.
+    // Cambiar un servicio de tipo también cuenta: «Botox» (tratamiento) no puede pasar a consulta si ya hay una «Botox».
+    const esConsultaFinal = cambiaTipo ? cambios.esConsulta : servicio.porcentaje === false;
+    const cambiaNombre = nombre !== undefined && nombre !== servicio.nombre;
+    if ((cambiaNombre || cambiaTipo) && await existeNombre(nombre ?? servicio.nombre, esConsultaFinal, servicio._id)) {
+        throw errorDuplicado(esConsultaFinal);
+    }
 
     // Especialista nuevo (null = dejar sin asignar).
     const cambiaEspecialista = cambios.especialistaId !== undefined

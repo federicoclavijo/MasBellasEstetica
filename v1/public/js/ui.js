@@ -43,6 +43,23 @@ export const hoyISO = () => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 };
 
+// Antelación mínima para que un cliente reserve online (debe coincidir con RESERVA_MIN_HORAS del servidor, 24 por defecto).
+export const MIN_HORAS_ANTICIPACION = 24;
+// Primer día que ofrece reservas online: el turno más cercano posible es "ahora + 24 h", o sea, mañana.
+export const primerDiaReservableISO = () => {
+  const d = new Date(Date.now() + MIN_HORAS_ANTICIPACION * 3600 * 1000);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
+
+// Foto de perfil nítida: las fotos se guardan en Cloudinary a tamaño original y el navegador las reducía a ~50 px,
+// lo que las veía pixeladas y con el rostro diminuto. Se pide un recorte cuadrado centrado en el ROSTRO (g_face),
+// al triple del tamaño mostrado (pantallas retina) y con la mejor calidad automática. Otras URL se dejan igual.
+export const fotoPerfil = (url, pxMostrados = 80) => {
+  if (!url || !/^https:\/\/res\.cloudinary\.com\/.+\/image\/upload\//.test(url) || /\/upload\/[^/]*c_fill/.test(url)) return url;
+  const lado = Math.min(Math.round(pxMostrados * 3), 800);
+  return url.replace("/upload/", `/upload/c_fill,g_face,w_${lado},h_${lado},q_auto:best,f_auto/`);
+};
+
 // --- Estados de botones ---------------------------------------------------------
 export function setCargando(boton, cargando, textoCargando = "Procesando…") {
   if (!boton) return;
@@ -174,13 +191,13 @@ export function proximasFechas(dias, cantidad = 6, desde = hoyISO()) {
 
 // "Dra. Ana atiende los sábados" + botones con las próximas fechas para elegir con un toque.
 // El <input type="date"> del navegador no permite bloquear días de la semana, por eso se sugieren las fechas válidas.
-export function sugerirFechas({ cont, especialista, actual, onElegir }) {
+export function sugerirFechas({ cont, especialista, actual, onElegir, desde }) {
   cont.replaceChildren();
   if (!especialista) return;
   const dias = diasDe(especialista);
   cont.append(
     el("p", { class: "field__hint" }, `${especialista.nombre} atiende los ${textoDias(dias)}. Próximas fechas:`),
-    el("div", { class: "chips" }, proximasFechas(dias).map((f) =>
+    el("div", { class: "chips" }, proximasFechas(dias, 6, desde ?? hoyISO()).map((f) =>
       el("button", { type: "button", class: "chip", "aria-pressed": String(f === actual), onclick: () => onElegir(f) },
         `${DIAS_ABREV[diaSemana(f)]} ${f.slice(8, 10)}/${f.slice(5, 7)}`))),
   );

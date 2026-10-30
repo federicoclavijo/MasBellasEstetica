@@ -40,6 +40,10 @@ export const NEGOCIO = Object.freeze({
     get direccion() { return (process.env.NEGOCIO_DIRECCION || "").trim(); },
     get telefonoContacto() { return (process.env.NEGOCIO_TELEFONO || "").trim(); },
 
+    // Antelación mínima (en horas) para que un CLIENTE reserve una consulta por la web: no puede tomar turnos
+    // que empiecen dentro de las próximas N horas. El administrador no tiene esta restricción.
+    minHorasAnticipacion: entero(process.env.RESERVA_MIN_HORAS, 24),
+
     // Cuántos días hacia adelante se puede reservar.
     maxDiasAnticipacion: entero(process.env.RESERVA_MAX_DIAS, 365),
 

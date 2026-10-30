@@ -148,7 +148,7 @@ a { color: var(--rose-strong); }
 .option__title { font-weight: 600; display: block; }
 .option__meta { font-size: .84rem; color: var(--muted); display: block; }
 .avatar {
-  width: 2.8rem; height: 2.8rem; border-radius: 50%; flex: none; object-fit: cover;
+  width: 2.8rem; height: 2.8rem; border-radius: 50%; flex: none; object-fit: cover; object-position: center 25%; /* prioriza el rostro si la foto no es cuadrada */
   background: var(--rose-pastel); color: var(--rose-strong); display: grid; place-items: center; font-weight: 700; font-size: .95rem;
 }
 
@@ -182,19 +182,21 @@ a { color: var(--rose-strong); }
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: .5rem;
   min-height: 2.9rem; padding: .65rem 1.3rem; border-radius: 999px; border: 1.5px solid transparent;
-  font-weight: 600; cursor: pointer; text-decoration: none; transition: background .2s ease, transform .2s ease, box-shadow .2s ease, border-color .2s ease, filter .2s ease;
+  font-weight: 600; cursor: pointer; text-decoration: none; transition: background-color .2s ease, transform .2s ease, box-shadow .2s ease, border-color .2s ease, filter .2s ease;
+  -webkit-tap-highlight-color: transparent;
 }
 .btn:hover:not(:disabled) { transform: translateY(-2px); }
 .btn:active:not(:disabled) { transform: translateY(0); transition-duration: .05s; }
 .btn:disabled { opacity: .55; cursor: not-allowed; }
 .btn--primary { background: linear-gradient(135deg, #c85780, var(--rose-strong) 60%, #a03f64); color: #fff; box-shadow: 0 4px 14px rgba(185, 74, 114, .30); }
-.btn--primary:hover:not(:disabled) { background: var(--rose-strong-hover); box-shadow: 0 8px 20px rgba(185, 74, 114, .34); }
+/* Hover sin cambiar `background`: pasar de un degradé a un color sólido no se puede animar y dejaba un destello blanco. Se oscurece con filter. */
+.btn--primary:hover:not(:disabled) { filter: brightness(.9) saturate(1.05); box-shadow: 0 8px 20px rgba(185, 74, 114, .34); }
 .btn--gold { background: var(--gold-gradient); color: #fff; box-shadow: 0 4px 14px rgba(168, 124, 36, .30); }
 .btn--gold:hover:not(:disabled) { filter: brightness(.97); box-shadow: 0 8px 20px rgba(168, 124, 36, .34); }
-.btn--ghost { background: transparent; border-color: var(--line); color: var(--ink); }
-.btn--ghost:hover:not(:disabled) { border-color: var(--rose-dusty); background: var(--blush); box-shadow: var(--shadow-sm); }
-.btn--danger { background: var(--err); color: #fff; }
-.btn--danger:hover:not(:disabled) { background: #862739; box-shadow: 0 8px 18px rgba(160, 48, 69, .28); }
+.btn--ghost { background-color: rgba(253, 234, 240, 0); border-color: var(--line); color: var(--ink); }
+.btn--ghost:hover:not(:disabled) { border-color: var(--rose-dusty); background-color: var(--blush); box-shadow: var(--shadow-sm); }
+.btn--danger { background-color: var(--err); color: #fff; }
+.btn--danger:hover:not(:disabled) { background-color: #862739; box-shadow: 0 8px 18px rgba(160, 48, 69, .28); }
 .btn--sm { min-height: 2.25rem; padding: .35rem .9rem; font-size: .88rem; }
 .btn--block { width: 100%; }
 .btn.is-loading::before {
@@ -202,8 +204,8 @@ a { color: var(--rose-strong); }
   animation: spin .7s linear infinite;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
-.icon-btn { background: none; border: 0; cursor: pointer; width: 2.4rem; height: 2.4rem; border-radius: 50%; color: var(--muted); transition: background .2s ease, color .2s ease, transform .2s ease; }
-.icon-btn:hover { background: var(--blush); color: var(--rose-strong); transform: scale(1.08); }
+.icon-btn { background-color: rgba(253, 234, 240, 0); border: 0; cursor: pointer; width: 2.4rem; height: 2.4rem; border-radius: 50%; color: var(--muted); transition: background-color .2s ease, color .2s ease, transform .2s ease; }
+.icon-btn:hover { background-color: var(--blush); color: var(--rose-strong); transform: scale(1.08); }
 
 /* Resumen ------------------------------------------------------------------------------ */
 .summary h2 { font-size: 1.6rem; margin-bottom: .9rem; }
@@ -252,6 +254,8 @@ a { color: var(--rose-strong); }
 /* Equipo: especialistas (solo informativos; se resalta el que está a cargo del servicio elegido) */
 .team { list-style: none; margin: 0; padding: 0; display: grid; gap: .6rem; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); }
 .team > .empty { grid-column: 1 / -1; }
+/* Foto de los especialistas en el formulario: un poco más grande para distinguir el rostro */
+.team__card .avatar { width: 4.5rem; height: 4.5rem; font-size: 1.25rem; border: 2px solid var(--gold-line); }
 .team__card {
   display: flex; align-items: center; gap: .75rem; padding: .8rem .9rem;
   border: 1.5px solid var(--line); border-radius: var(--radius-sm); background: var(--ivory);
@@ -295,6 +299,8 @@ a { color: var(--rose-strong); }
 .about-hero__actions { display: flex; gap: .7rem; flex-wrap: wrap; margin-top: 1.5rem; }
 .figure { margin: 0; border-radius: var(--radius); overflow: hidden; border: 1px solid var(--gold-line); background: #fff; box-shadow: var(--shadow); }
 .figure img { width: 100%; height: auto; }
+/* Foto propia que reemplaza a la ilustración (ver js/nosotros.js): se recorta al mismo formato que la ilustración. */
+.figure img.is-foto { object-fit: cover; }
 
 .split { display: grid; gap: 1.6rem; align-items: center; }
 @media (min-width: 52rem) { .split { grid-template-columns: 1fr 1fr; gap: 3rem; } .split--reverse .figure { order: -1; } }

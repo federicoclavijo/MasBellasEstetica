@@ -2,7 +2,9 @@ import mongoose, { Schema } from "mongoose";
 import { esConsulta, duracionDe, calcularCobro } from "../utils/cobro.util.js";
 
 const servicioSchema = new Schema({
-    nombre: { type: String, required: true, unique: true, trim: true },
+    // El nombre ya NO es único por sí solo: una consulta y un tratamiento pueden llamarse igual (p. ej. «Botox»).
+    // La unicidad es por (nombre + tipo): no puede haber 2 consultas ni 2 tratamientos con el mismo nombre (índice de abajo).
+    nombre: { type: String, required: true, trim: true },
     // Consulta: siempre $500 (lo fija el servidor). Tratamiento: precio de referencia OPCIONAL; el importe real
     // lo define el administrador en cada reserva, porque varía según el cliente.
     precio: { type: Number, min: 1, default: null },
@@ -19,6 +21,10 @@ const servicioSchema = new Schema({
     toJSON: { virtuals: true, id: false },
     toObject: { virtuals: true, id: false },
 });
+
+// Unicidad por tipo, sin distinguir mayúsculas/minúsculas (strength 2). `porcentaje` false = consulta, true = tratamiento.
+// El índice único viejo sobre `nombre` solo lo elimina prepararIndices() (indices.config.js) al iniciar, porque ya no se declara.
+servicioSchema.index({ nombre: 1, porcentaje: 1 }, { unique: true, collation: { locale: "es", strength: 2 } });
 
 // Datos calculados por el servidor (así el frontend no duplica las reglas de negocio).
 servicioSchema.virtual("esConsulta").get(function () { return esConsulta(this); });

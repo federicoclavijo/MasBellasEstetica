@@ -1,5 +1,49 @@
 # MasBellas · Servidor — Cambios realizados
 
+# Actualización 9 · Botones, antelación de 24 h, fotos de especialistas y fotos de Nosotros
+
+### Botones (hover)
+- El destello blanco venía de `.btn--primary`: pasaba de un degradé a un color sólido al hacer hover, y eso no se puede animar. Ahora el hover oscurece con `filter` (animable) y el resto de botones animan solo `background-color`, con fondos transparentes definidos con alfa para que no haya saltos.
+
+### Reservas con 24 h de antelación (solo clientes)
+- Por la web no se ofrecen ni se aceptan consultas que empiecen dentro de las próximas 24 h. Se valida en el servidor (la disponibilidad pública ya no devuelve esos horarios y el alta devuelve 400 con «Las reservas online requieren al menos 24 horas de antelación…»).
+- El **administrador no tiene esa restricción** (agenda tratamientos y reprograma como antes).
+- Configurable con la variable `RESERVA_MIN_HORAS` (por defecto 24). El formulario público bloquea hoy en el calendario, sugiere fechas desde mañana y muestra el aviso; se aclaró en Términos (resumen y punto 2) y en el formulario. Si cambiás la variable, ajustá también `MIN_HORAS_ANTICIPACION` en `v1/public/js/ui.js`.
+
+### Fotos de especialistas
+- Las fotos se mostraban con el original reducido por el navegador a ~50 px (pixeladas y con el rostro minúsculo). Ahora se piden a Cloudinary recortadas **centradas en el rostro** (`g_face`), cuadradas, a 3× del tamaño mostrado y con calidad automática alta (`fotoPerfil()` en `ui.js`).
+- Más grandes: formulario 2,8 → 4,5 rem; panel de especialistas 3,6 → 5 rem (con borde dorado). Nosotros mantiene su tamaño pero con la mejora de nitidez.
+
+### Fotos propias en «Nosotros»
+- Copiá tus fotos a `v1/public/img/` con estos nombres exactos (extensión `.jpg`, `.jpeg`, `.webp` o `.png`): `nosotros-principal` (arriba), `nosotros-espacio` (el espacio) y `nosotros-cuidado` (cuidado de la piel). Si el archivo existe reemplaza a la ilustración; si no, se sigue viendo la ilustración. Texto alternativo en el atributo `data-alt` de `nosotros.html`.
+
+---
+
+# Actualización 8 · SEO, nombres iguales entre consulta y tratamiento, filtros por tipo
+
+### Nombres: consulta y tratamiento pueden llamarse igual
+- Antes el nombre del servicio era único en toda la colección. Ahora es único **por tipo**: puede haber una consulta «Botox» y un tratamiento «Botox», pero no 2 consultas ni 2 tratamientos con el mismo nombre (sin distinguir mayúsculas).
+- Índice único nuevo `nombre + tipo`. **El índice viejo `nombre_1` se elimina solo al iniciar el servidor** (limpieza de índices obsoletos ya existente), no hace falta tocar la base.
+- Al editar se valida con el nombre y el tipo resultantes (renombrar o convertir una consulta en tratamiento también respeta la regla). Mensajes: «Ya existe una consulta / un tratamiento con ese nombre».
+- Panel → Especialistas: los servicios a cargo se muestran con su tipo, «Botox (consulta)» / «Botox (tratamiento)», para distinguirlos.
+
+### Filtros por tipo en el panel
+- **Servicios:** selector «Consultas y tratamientos / Solo consultas / Solo tratamientos», búsqueda por nombre o especialista y contador.
+- **Reservas:** nuevo filtro «Tipo de reserva» (consultas o tratamientos), combinable con los demás.
+
+### SEO
+- `/robots.txt` y `/sitemap.xml` generados por el servidor (bloquean `/admin.html`, `/resultado.html` y `/v1/`).
+- Páginas públicas con `canonical`, Open Graph, Twitter Card, `theme-color`, títulos y descripciones propios, y datos estructurados JSON-LD (`MedicalClinic` en inicio, `AboutPage` en Nosotros). Imagen para compartir `img/og-image.png` (1200×630).
+- Panel y resultado de pago con `noindex, nofollow` (meta + cabecera `X-Robots-Tag`; también para la API). Enlace al panel con `rel="nofollow"`.
+- La URL pública sale de la variable **`SITE_URL`** (ej. `https://masbellas.com.uy`); si no se define se deduce del dominio de la solicitud. **Conviene definirla en Vercel.**
+- Caché de 7 días para imágenes; `vercel.json` incluye `v1/public/**` en el despliegue.
+- Pendiente de la clínica: el teléfono, el correo y la dirección del pie son de ejemplo, por eso no se publican en los datos estructurados; al cargar los reales conviene agregarlos (`telephone`, `address`).
+
+### Pruebas
+- `npm test` (12) pasa. Se agregó una prueba de integración de nombres por tipo (necesita `TEST_MONGO_URI`; no se pudo ejecutar en este entorno).
+
+---
+
 # Actualización 7 · Aviso a administradores, constancia de asistencia y animaciones hover
 
 ### Aviso por correo a los administradores cuando se paga una reserva

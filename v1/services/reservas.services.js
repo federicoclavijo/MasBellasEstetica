@@ -5,7 +5,7 @@ import { NEGOCIO, ESTADOS_ACTIVOS } from "../config/negocio.config.js";
 import { crearError } from "../utils/http-error.util.js";
 import { esObjectIdValido } from "../utils/id.util.js";
 import {
-    ahoraNegocio, esFechaValida, esHoraValida, generarFranjas,
+    ahoraNegocio, sinAntelacionMinima, esFechaValida, esHoraValida, generarFranjas,
     franjaYaPaso, hayCruce, sumarDias, diaSemana, diasDeAtencion, atiendeEseDia, mensajeDiaNoAtendido
 } from "../utils/horarios.util.js";
 import { calcularCobro, calcularCobroTratamiento, duracionDe, calcularReembolso, esConsulta } from "../utils/cobro.util.js";
@@ -28,7 +28,7 @@ const duracionDeReserva = (reserva) => reserva.duracionMinutos ?? 60;
 
 // El especialista debe atender ese día de la semana, el horario debe existir en la grilla del servicio,
 // no haber empezado ya y estar dentro del plazo permitido.
-const validarTurno = ({ fecha, hora, duracion, especialista }) => {
+const validarTurno = ({ fecha, hora, duracion, especialista, aplicarAntelacion = false }) => {
     if (!esFechaValida(fecha)) {
         throw crearError(400, "La fecha debe tener formato YYYY-MM-DD y ser una fecha real");
     }
@@ -45,6 +45,11 @@ const validarTurno = ({ fecha, hora, duracion, especialista }) => {
 
     if (franjaYaPaso(fecha, hora, ahora)) {
         throw crearError(400, "No se puede reservar en un horario que ya pasó");
+    }
+
+    // Solo los clientes: deben reservar con al menos 24 h de antelación (el administrador puede agendar sin ese margen).
+    if (aplicarAntelacion && sinAntelacionMinima(fecha, hora, NEGOCIO.minHorasAnticipacion, ahora)) {
+        throw crearError(400, mensajeAntelacion());
     }
 
     if (fecha > sumarDias(ahora.fecha, NEGOCIO.maxDiasAnticipacion)) {
@@ -69,14 +74,19 @@ const verificarDisponibilidad = async ({ especialistaId, fecha, hora, duracion, 
     }
 };
 
-const calcularDisponibilidad = async ({ especialistaId, fecha, duracion, excluirReservaId }) => {
+const mensajeAntelacion = () =>
+    `Las reservas online requieren al menos ${NEGOCIO.minHorasAnticipacion} horas de antelación. Elige un horario posterior.`;
+
+const calcularDisponibilidad = async ({ especialistaId, fecha, duracion, excluirReservaId, aplicarAntelacion = false }) => {
     const existentes = await reservasQueOcupan(especialistaId, fecha, excluirReservaId);
     const ahora = ahoraNegocio();
     const franjas = generarFranjas(duracion);
 
     return {
         horariosDisponibles: franjas.filter(
-            (h) => !franjaYaPaso(fecha, h, ahora) && !chocaConAlguna(h, duracion, existentes)
+            (h) => !franjaYaPaso(fecha, h, ahora)
+                && !(aplicarAntelacion && sinAntelacionMinima(fecha, h, NEGOCIO.minHorasAnticipacion, ahora))
+                && !chocaConAlguna(h, duracion, existentes)
         ),
         horariosOcupados: franjas.filter((h) => chocaConAlguna(h, duracion, existentes)),
     };
@@ -85,7 +95,7 @@ const calcularDisponibilidad = async ({ especialistaId, fecha, duracion, excluir
 // Horarios de un día para un especialista. Si ese día de la semana no atiende, no hay horarios y se explica por qué
 // (la fecha es válida, simplemente no es un día de atención): así los formularios de clientes y de administración
 // muestran el mismo mensaje y los mismos días.
-const disponibilidadDelDia = async ({ especialista, especialistaId, fecha, duracion, excluirReservaId }) => {
+const disponibilidadDelDia = async ({ especialista, especialistaId, fecha, duracion, excluirReservaId, aplicarAntelacion = false }) => {
     const base = {
         especialistaNombre: especialista?.nombre ?? null,
         diasDisponibles: diasDeAtencion(especialista),
@@ -96,7 +106,7 @@ const disponibilidadDelDia = async ({ especialista, especialistaId, fecha, durac
     }
 
     await expirarReservasPendientesService({ especialistaId, fecha });
-    return { ...base, atiendeEseDia: true, ...(await calcularDisponibilidad({ especialistaId, fecha, duracion, excluirReservaId })) };
+    return { ...base, atiendeEseDia: true, ...(await calcularDisponibilidad({ especialistaId, fecha, duracion, excluirReservaId, aplicarAntelacion })), minHorasAnticipacion: aplicarAntelacion ? NEGOCIO.minHorasAnticipacion : 0 };
 };
 
 // --- Vencimiento de reservas pendientes ------------------------------------------------------
@@ -290,7 +300,7 @@ export const obtenerDisponibilidadService = async (fecha, servicioId, { admin = 
         servicioId: servicio._id,
         especialistaId: servicio.especialistaId,
         duracionMinutos: duracion,
-        ...(await disponibilidadDelDia({ especialista, especialistaId: servicio.especialistaId, fecha, duracion })),
+        ...(await disponibilidadDelDia({ especialista, especialistaId: servicio.especialistaId, fecha, duracion, aplicarAntelacion: !admin })),
     };
 };
 
@@ -334,7 +344,7 @@ export const guardarReservaService = async (nuevaReserva) => {
 
     // 2. Horario válido según la duración del servicio (30 min la consulta, 60 min el resto).
     const duracion = duracionDe(servicio);
-    validarTurno({ fecha, hora, duracion, especialista });
+    validarTurno({ fecha, hora, duracion, especialista, aplicarAntelacion: true });
 
     // 3. Liberar lo vencido y lo propio pendiente, y comprobar que el horario siga libre.
     await expirarReservasPendientesService({ especialistaId: especialista._id, fecha });

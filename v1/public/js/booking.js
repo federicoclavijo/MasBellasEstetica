@@ -2,7 +2,7 @@
 import { crearReserva, listarServiciosPublico, listarEspecialistasPublico, obtenerDisponibilidad, ApiError } from "./api.js";
 import { STORAGE } from "./config.js";
 import {
-  el, $, vaciar, formatearMoneda, formatearFecha, formatearFechaCorta, hoyISO, setCargando, iniciales, normalizarTelefonoUY, sugerirFechas, diasDe, textoDias,
+  el, $, vaciar, formatearMoneda, formatearFecha, formatearFechaCorta, hoyISO, fotoPerfil, primerDiaReservableISO, MIN_HORAS_ANTICIPACION, setCargando, iniciales, normalizarTelefonoUY, sugerirFechas, diasDe, textoDias,
 } from "./ui.js";
 
 const estado = {
@@ -100,7 +100,7 @@ function renderEquipo() {
     const activo = aCargo?._id === e._id;
     const aCargoDe = (e.servicios ?? []).map((x) => x.nombre);
     const avatar = e.imagenPerfil
-      ? el("img", { class: "avatar", src: e.imagenPerfil, alt: "", loading: "lazy" })
+      ? el("img", { class: "avatar", src: fotoPerfil(e.imagenPerfil, 72), alt: "", width: 72, height: 72, loading: "lazy", decoding: "async" })
       : el("span", { class: "avatar", "aria-hidden": "true" }, iniciales(e.nombre));
     cont.append(el("li", { class: `team__card${activo ? " is-active" : ""}${hayServicio && !activo ? " is-dim" : ""}`, "aria-current": activo ? "true" : null },
       avatar,
@@ -122,6 +122,7 @@ function renderFechasSugeridas() {
     cont: $("#fechas-sugeridas"),
     especialista: especialistaElegido(),
     actual: form.elements.fecha.value,
+    desde: primerDiaReservableISO(),
     onElegir: (f) => {
       form.elements.fecha.value = f;
       limpiarError("fecha");
@@ -133,6 +134,8 @@ function renderFechasSugeridas() {
 }
 
 // --- Horarios ---------------------------------------------------------------------------------------
+const textoAntelacion = () => `Las reservas online requieren al menos ${MIN_HORAS_ANTICIPACION} horas de antelación. Elige una fecha a partir de mañana.`;
+
 function renderHoras() {
   const fecha = form.elements.fecha.value;
   const cont = vaciar($("#lista-horas"));
@@ -148,9 +151,13 @@ function renderHoras() {
     return;
   }
   if (estado.disponibilidadEstado !== "loaded") {
-    return mensaje(fecha < hoyISO() ? "La fecha no puede ser anterior a hoy." : "Elige un tipo de consulta y una fecha para ver los horarios disponibles.");
+    return mensaje(fecha < primerDiaReservableISO() ? textoAntelacion() : "Elige un tipo de consulta y una fecha para ver los horarios disponibles.");
   }
-  if (!estado.horariosDisponibles.length) return mensaje("No hay horarios disponibles para esta fecha. Prueba con otro día.");
+  if (!estado.horariosDisponibles.length) {
+    return mensaje(fecha <= primerDiaReservableISO()
+      ? `No quedan horarios para esa fecha: las reservas online requieren al menos ${MIN_HORAS_ANTICIPACION} horas de antelación. Prueba con otro día.`
+      : "No hay horarios disponibles para esta fecha. Prueba con otro día.");
+  }
 
   for (const hora of estado.horariosDisponibles) {
     const input = el("input", { type: "radio", name: "hora", value: hora, id: `hora-${hora}`, checked: estado.hora === hora });
@@ -174,7 +181,7 @@ async function cargarDisponibilidad() {
     ? `Atendemos de 08:00 a 20:00. Los turnos de consulta son cada ${servicio.duracionMinutos === 30 ? "30 minutos" : "hora"}. Elige un único horario.`
     : "Atendemos de 08:00 a 20:00. Elige un único horario.";
 
-  if (!fecha || !servicioId || fecha < hoyISO()) {
+  if (!fecha || !servicioId || fecha < primerDiaReservableISO()) {
     estado.disponibilidadEstado = "idle";
     renderHoras();
     actualizarResumen();
@@ -256,7 +263,7 @@ function validar() {
   else if (nacimiento < "1900-01-01") errores.fechaNacimiento = "Ingresa una fecha de nacimiento válida.";
   if (!estado.servicioId) errores.servicio = "Elige un tipo de consulta.";
   if (!form.elements.fecha.value) errores.fecha = "Elige una fecha.";
-  else if (form.elements.fecha.value < hoyISO()) errores.fecha = "La fecha no puede ser anterior a hoy.";
+  else if (form.elements.fecha.value < primerDiaReservableISO()) errores.fecha = textoAntelacion();
   if (estado.disponibilidadEstado === "closed") errores.fecha = estado.disponibilidadError || "El especialista no atiende ese día. Elige otra fecha.";
   else if (estado.disponibilidadEstado !== "loaded") errores.hora = "Espera a que se carguen los horarios disponibles.";
   else if (!estado.hora || !estado.horariosDisponibles.includes(estado.hora)) errores.hora = "Elige un horario disponible.";
@@ -337,7 +344,7 @@ form.addEventListener("submit", async (evento) => {
 });
 
 // --- Inicio ---------------------------------------------------------------------------------------------------------------
-form.elements.fecha.min = hoyISO();
+form.elements.fecha.min = primerDiaReservableISO();
 form.elements.fechaNacimiento.max = hoyISO();
 form.elements.fecha.addEventListener("change", () => {
   limpiarError("fecha");

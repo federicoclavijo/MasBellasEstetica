@@ -1,7 +1,7 @@
 // Pruebas de las reglas puras (no necesitan base de datos): npm test
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { generarFranjas, hayCruce, franjaYaPaso, esFechaValida, ahoraNegocio, sumarDias } from "../v1/utils/horarios.util.js";
+import { generarFranjas, hayCruce, franjaYaPaso, esFechaValida, ahoraNegocio, sumarDias, minutosHastaTurno, sinAntelacionMinima } from "../v1/utils/horarios.util.js";
 import { calcularCobro, calcularCobroTratamiento, duracionDe, esConsulta, precioFinal, calcularReembolso } from "../v1/utils/cobro.util.js";
 import { normalizarTelefonoUY, formatearTelefonoUY, telefonoParaWhatsApp } from "../v1/utils/telefono.util.js";
 import { construirMensajeWhatsApp, urlWhatsApp } from "../v1/utils/whatsapp.util.js";
@@ -146,4 +146,18 @@ test("días de atención: día de la semana, valor por defecto y textos", async 
     assert.equal(u.textoDias([6]), "sábados");
     assert.equal(u.textoDias([1, 3, 6]), "lunes, miércoles y sábados");
     assert.equal(u.mensajeDiaNoAtendido({ nombre: "Dra. Ana", diasDisponibles: [6] }, "2026-10-26"), "Dra. Ana no atiende los lunes. Atiende: sábados. Elige otra fecha.");
+});
+
+test("antelación: el cliente solo reserva turnos que empiezan dentro de 24 h o más", () => {
+    const ahora = ahoraNegocio(new Date("2026-10-19T18:00:00Z")); // 15:00 en Montevideo
+    assert.deepEqual(ahora, { fecha: "2026-10-19", minutos: 15 * 60 });
+    assert.equal(minutosHastaTurno("2026-10-20", "15:00", ahora), 1440);
+    assert.equal(minutosHastaTurno("2026-10-19", "18:00", ahora), 180);
+    assert.equal(sinAntelacionMinima("2026-10-19", "19:00", 24, ahora), true);   // hoy
+    assert.equal(sinAntelacionMinima("2026-10-20", "14:30", 24, ahora), true);   // mañana, 30 min antes del límite
+    assert.equal(sinAntelacionMinima("2026-10-20", "15:00", 24, ahora), false);  // justo 24 h
+    assert.equal(sinAntelacionMinima("2026-10-20", "15:30", 24, ahora), false);
+    assert.equal(sinAntelacionMinima("2026-12-31", "08:00", 24, ahora), false);
+    assert.equal(sinAntelacionMinima("2026-10-19", "15:00", 0, ahora), true);    // sin antelación: igual no vale un turno ya iniciado
+    assert.equal(sinAntelacionMinima("2026-10-19", "15:30", 0, ahora), false);
 });

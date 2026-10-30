@@ -55,6 +55,16 @@ export const generarFranjas = (duracionMinutos) => {
 export const franjaYaPaso = (fecha, hora, ahora = ahoraNegocio()) =>
     fecha < ahora.fecha || (fecha === ahora.fecha && aMinutos(hora) <= ahora.minutos);
 
+// Minutos que faltan desde "ahora" hasta el inicio del turno (negativo si ya empezó). Se calcula con la hora local del negocio.
+export const minutosHastaTurno = (fecha, hora, ahora = ahoraNegocio()) => {
+    const dias = (Date.parse(`${fecha}T00:00:00.000Z`) - Date.parse(`${ahora.fecha}T00:00:00.000Z`)) / 86_400_000;
+    return dias * 1440 + aMinutos(hora) - ahora.minutos;
+};
+
+// ¿El turno empieza antes de que se cumpla la antelación mínima (en horas)? Con 0 equivale a "ya empezó".
+export const sinAntelacionMinima = (fecha, hora, horasMinimas, ahora = ahoraNegocio()) =>
+    minutosHastaTurno(fecha, hora, ahora) < Math.max(horasMinimas * 60, 1);
+
 // ¿Se pisan dos turnos [horaA, horaA+durA) y [horaB, horaB+durB)?
 export const hayCruce = (horaA, durA, horaB, durB) => {
     const a = aMinutos(horaA);
