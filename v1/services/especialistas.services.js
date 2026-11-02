@@ -1,6 +1,7 @@
 import Especialista from "../models/especialista.model.js";
 import Servicio from "../models/servicio.model.js";
 import { crearError } from "../utils/http-error.util.js";
+import { ahoraNegocio, modoDisponibilidad, fechasDeAtencion } from "../utils/horarios.util.js";
 import { esObjectIdValido } from "../utils/id.util.js";
 import { subirImagenService } from "./uploads.service.js";
 import { contarReservasFuturasActivas, contarReservasFueraDeDias } from "./reservas.services.js";
@@ -13,6 +14,11 @@ const validarId = (id) => {
 };
 
 const escapar = (texto) => texto.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+// Fechas puntuales de atención: sin repetir, ordenadas y SIN las que ya pasaron (no sirven para reservar).
+const limpiarFechas = (fechas) => [...new Set(fechas)].filter((f) => f >= ahoraNegocio().fecha).sort();
+
+const errorSinFechas = () => crearError(400, "Elige al menos una fecha de atención en el calendario (o cambia a «Días de la semana»)");
 
 const existeNombre = async (nombre, excluirId) => {
     const filtro = { nombre: new RegExp(`^${escapar(nombre.trim())}$`, "i") };
@@ -41,14 +47,21 @@ export const obtenerEspecialistaPorIdService = async (id, { incluirInactivos = t
     return especialista;
 };
 
-export const guardarEspecialistaService = async ({ nombre, rol, diasDisponibles, serviciosIds }) => {
+export const guardarEspecialistaService = async ({ nombre, rol, diasDisponibles, tipoDisponibilidad = "semanal", fechasDisponibles, serviciosIds }) => {
     nombre = nombre.trim();
+
+    // Una sola modalidad a la vez: con "fechas" tiene que haber al menos una fecha que todavía no haya pasado.
+    const fechas = limpiarFechas(fechasDisponibles ?? []);
+    if (tipoDisponibilidad === "fechas" && !fechas.length) throw errorSinFechas();
 
     if (await existeNombre(nombre)) {
         throw crearError(409, "Ya existe un especialista con ese nombre");
     }
 
-    const especialista = await Especialista.create({ nombre, rol, ...(diasDisponibles ? { diasDisponibles: [...diasDisponibles].sort((a, b) => a - b) } : {}) });
+    const especialista = await Especialista.create({
+        nombre, rol, tipoDisponibilidad, fechasDisponibles: fechas,
+        ...(diasDisponibles ? { diasDisponibles: [...diasDisponibles].sort((a, b) => a - b) } : {}),
+    });
 
     if (serviciosIds?.length) {
         try {
@@ -80,6 +93,14 @@ export const actualizarEspecialistaService = async (id, cambios) => {
         especialista.diasDisponibles = [...cambios.diasDisponibles].sort((a, b) => a - b);
     }
 
+    // Modalidad de atención: por días de la semana O por fechas puntuales. Lo cargado en la modalidad que no está activa
+    // se conserva (por si se vuelve a ella) pero no se aplica.
+    if (cambios.tipoDisponibilidad !== undefined) especialista.tipoDisponibilidad = cambios.tipoDisponibilidad;
+    if (cambios.fechasDisponibles !== undefined) especialista.fechasDisponibles = limpiarFechas(cambios.fechasDisponibles);
+    if (modoDisponibilidad(especialista) === "fechas" && !limpiarFechas(fechasDeAtencion(especialista)).length) {
+        throw errorSinFechas();
+    }
+
     // La asignación se valida completa antes de guardar nada.
     if (cambios.serviciosIds !== undefined) {
         await asignarServiciosAEspecialistaService(especialista._id, cambios.serviciosIds);
@@ -92,8 +113,9 @@ export const actualizarEspecialistaService = async (id, cambios) => {
 
     // Cambiar los días NO cancela nada: las reservas ya hechas se respetan. Pero se avisa cuántas quedaron en un día
     // que ya no atiende, para que el administrador las reprograme.
-    const reservasFueraDeDia = cambios.diasDisponibles !== undefined
-        ? await contarReservasFueraDeDias(actualizado._id, actualizado.diasDisponibles)
+    const cambioDisponibilidad = ["diasDisponibles", "tipoDisponibilidad", "fechasDisponibles"].some((c) => cambios[c] !== undefined);
+    const reservasFueraDeDia = cambioDisponibilidad
+        ? await contarReservasFueraDeDias(actualizado._id, actualizado)
         : 0;
 
     return { especialista: actualizado, reservasFueraDeDia };

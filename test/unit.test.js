@@ -161,3 +161,29 @@ test("antelación: el cliente solo reserva turnos que empiezan dentro de 24 h o 
     assert.equal(sinAntelacionMinima("2026-10-19", "15:00", 0, ahora), true);    // sin antelación: igual no vale un turno ya iniciado
     assert.equal(sinAntelacionMinima("2026-10-19", "15:30", 0, ahora), false);
 });
+
+test("días de atención: solo una modalidad a la vez (días de la semana O fechas puntuales)", async () => {
+    const u = await import("../v1/utils/horarios.util.js");
+    // Sin el campo (especialistas anteriores) o "semanal": cuentan los días de la semana y se ignoran las fechas guardadas.
+    assert.equal(u.modoDisponibilidad({}), "semanal");
+    assert.equal(u.modoDisponibilidad({ tipoDisponibilidad: "semanal" }), "semanal");
+    const semanal = { nombre: "Dra. Ana", tipoDisponibilidad: "semanal", diasDisponibles: [6], fechasDisponibles: ["2099-11-04"] };
+    assert.equal(u.atiendeEseDia(semanal, "2099-11-07"), true);    // sábado
+    assert.equal(u.atiendeEseDia(semanal, "2099-11-04"), false);   // miércoles: la fecha guardada NO cuenta en modo semanal
+
+    // "fechas": solo valen las fechas puntuales, aunque haya días de la semana guardados.
+    const fechas = { nombre: "Dra. Ana", tipoDisponibilidad: "fechas", diasDisponibles: [6], fechasDisponibles: ["2099-11-18", "2099-11-04", "2099-11-04"] };
+    assert.equal(u.modoDisponibilidad(fechas), "fechas");
+    assert.deepEqual(u.fechasDeAtencion(fechas), ["2099-11-04", "2099-11-18"]);
+    assert.equal(u.atiendeEseDia(fechas, "2099-11-04"), true);
+    assert.equal(u.atiendeEseDia(fechas, "2099-11-18"), true);
+    assert.equal(u.atiendeEseDia(fechas, "2099-11-07"), false);    // sábado, pero no es una de sus fechas
+    assert.equal(u.atiendeEseDia({ ...fechas, fechasDisponibles: [] }, "2099-11-04"), false);
+
+    assert.deepEqual(u.fechasProximas(fechas, "2099-11-05"), ["2099-11-18"]);   // las pasadas no cuentan
+    assert.equal(u.fechaLegible("2099-11-04"), "04/11/2099");
+    assert.equal(u.descripcionDisponibilidad(semanal), "los sábados");
+    assert.equal(u.descripcionDisponibilidad(fechas, "2099-01-01"), "solo en fechas puntuales (04/11, 18/11)");
+    assert.match(u.descripcionDisponibilidad({ ...fechas, fechasDisponibles: [] }), /por ahora no tiene fechas/);
+    assert.equal(u.mensajeDiaNoAtendido(fechas, "2099-11-07"), "Dra. Ana no atiende el 07/11/2099. Fechas disponibles: 04/11/2099, 18/11/2099. Elige otra fecha.");
+});

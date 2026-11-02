@@ -189,16 +189,119 @@ export function proximasFechas(dias, cantidad = 6, desde = hoyISO()) {
   return salida;
 }
 
-// "Dra. Ana atiende los sábados" + botones con las próximas fechas para elegir con un toque.
-// El <input type="date"> del navegador no permite bloquear días de la semana, por eso se sugieren las fechas válidas.
+// --- Modalidad de atención: días de la semana O fechas puntuales ---------------------------------------
+// Igual que en el servidor (horarios.util.js): solo una modalidad está activa a la vez.
+export const modoDe = (especialista) => (especialista?.tipoDisponibilidad === "fechas" ? "fechas" : "semanal");
+
+// Fechas puntuales de atención que todavía no pasaron (desde `desde`, inclusive), ordenadas.
+export const fechasDe = (especialista, desde = hoyISO()) =>
+  Array.isArray(especialista?.fechasDisponibles) ? [...new Set(especialista.fechasDisponibles)].filter((f) => f >= desde).sort() : [];
+
+// "2026-11-07" -> "07/11"
+const diaMes = (f) => `${f.slice(8, 10)}/${f.slice(5, 7)}`;
+
+// Texto corto de cuándo atiende: "lunes, miércoles y sábados" · "fechas puntuales (07/11, 21/11 y 3 más)".
+export const textoDisponibilidad = (especialista) => {
+  if (modoDe(especialista) === "semanal") return textoDias(diasDe(especialista));
+  const f = fechasDe(especialista);
+  if (!f.length) return "fechas puntuales (por ahora ninguna)";
+  const muestra = f.slice(0, 4).map(diaMes).join(", ");
+  return `fechas puntuales (${muestra}${f.length > 4 ? ` y ${f.length - 4} más` : ""})`;
+};
+
+// Próximas fechas en que atiende, según la modalidad activa.
+export const proximasFechasDe = (especialista, cantidad = 6, desde = hoyISO()) =>
+  modoDe(especialista) === "fechas" ? fechasDe(especialista, desde).slice(0, Math.max(cantidad, 8)) : proximasFechas(diasDe(especialista), cantidad, desde);
+
+// "Dra. Ana atiende los sábados" (o "solo en fechas puntuales") + botones con las próximas fechas para elegir con un toque.
+// El <input type="date"> del navegador no permite bloquear días, por eso se sugieren las fechas válidas.
 export function sugerirFechas({ cont, especialista, actual, onElegir, desde }) {
   cont.replaceChildren();
   if (!especialista) return;
-  const dias = diasDe(especialista);
+  const fechas = proximasFechasDe(especialista, 6, desde ?? hoyISO());
+  const porFechas = modoDe(especialista) === "fechas";
+  if (porFechas && !fechas.length) {
+    cont.append(el("p", { class: "field__hint" }, `${especialista.nombre} no tiene fechas de atención disponibles por el momento.`));
+    return;
+  }
   cont.append(
-    el("p", { class: "field__hint" }, `${especialista.nombre} atiende los ${textoDias(dias)}. Próximas fechas:`),
-    el("div", { class: "chips" }, proximasFechas(dias, 6, desde ?? hoyISO()).map((f) =>
+    el("p", { class: "field__hint" }, porFechas
+      ? `${especialista.nombre} atiende solo en fechas puntuales. Próximas fechas:`
+      : `${especialista.nombre} atiende los ${textoDias(diasDe(especialista))}. Próximas fechas:`),
+    el("div", { class: "chips" }, fechas.map((f) =>
       el("button", { type: "button", class: "chip", "aria-pressed": String(f === actual), onclick: () => onElegir(f) },
-        `${DIAS_ABREV[diaSemana(f)]} ${f.slice(8, 10)}/${f.slice(5, 7)}`))),
+        `${DIAS_ABREV[diaSemana(f)]} ${diaMes(f)}`))),
   );
+}
+
+// --- Calendario para elegir varias fechas -------------------------------------------------------------
+const MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+const SEMANA_LUN = [1, 2, 3, 4, 5, 6, 0]; // la semana empieza el lunes
+const iso = (a, m, d) => `${a}-${String(m + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+
+// Calendario mensual de selección múltiple. Se toca un día para marcarlo o desmarcarlo; solo se pueden elegir
+// días entre `desde` y `hasta` (YYYY-MM-DD). `onChange(fechasOrdenadas)` se llama en cada cambio.
+// Devuelve un elemento con `.fechas()` para leer el valor actual.
+export function crearCalendarioFechas({ seleccionadas = [], desde = hoyISO(), hasta, onChange } = {}) {
+  const elegidas = new Set(seleccionadas);
+  const [ad, md] = desde.split("-").map(Number);
+  const limite = hasta ?? (() => { const d = new Date(Date.UTC(ad + 1, md - 1, 1)); return d.toISOString().slice(0, 10); })();
+  const [ah, mh] = limite.split("-").map(Number);
+  let anio = ad, mes = md - 1;
+  // Se abre en el mes de la primera fecha ya elegida (si la hay), para que se vea lo cargado.
+  const primera = [...elegidas].filter((f) => f >= desde).sort()[0];
+  if (primera) { anio = Number(primera.slice(0, 4)); mes = Number(primera.slice(5, 7)) - 1; }
+
+  const raiz = el("div", { class: "cal" });
+  const lista = el("div", { class: "cal__sel" });
+  const todas = () => [...elegidas].sort();
+  const cambio = () => { onChange?.(todas()); pintar(); };
+
+  function alternar(f) { elegidas.has(f) ? elegidas.delete(f) : elegidas.add(f); cambio(); }
+
+  function pintar() {
+    const mesAnteriorOk = anio * 12 + mes > ad * 12 + (md - 1);
+    const mesSiguienteOk = anio * 12 + mes < ah * 12 + (mh - 1);
+    const primerDia = new Date(Date.UTC(anio, mes, 1)).getUTCDay();
+    const huecos = SEMANA_LUN.indexOf(primerDia);
+    const diasMes = new Date(Date.UTC(anio, mes + 1, 0)).getUTCDate();
+    const hoy = hoyISO();
+
+    const celdas = Array.from({ length: huecos }, () => el("span", { class: "cal__vacio", "aria-hidden": "true" }));
+    for (let d = 1; d <= diasMes; d++) {
+      const f = iso(anio, mes, d);
+      const fuera = f < desde || f > limite;
+      const marcado = elegidas.has(f);
+      celdas.push(el("button", {
+        type: "button", class: `cal__dia${marcado ? " is-on" : ""}${f === hoy ? " is-hoy" : ""}`, disabled: fuera,
+        "aria-pressed": String(marcado),
+        "aria-label": `${DIAS_SEMANA[diaSemana(f)]} ${d} de ${MESES[mes]} de ${anio}`,
+        onclick: () => alternar(f),
+      }, String(d)));
+    }
+
+    raiz.replaceChildren(
+      el("div", { class: "cal__nav" },
+        el("button", { type: "button", class: "icon-btn", "aria-label": "Mes anterior", disabled: !mesAnteriorOk, onclick: () => { mes--; if (mes < 0) { mes = 11; anio--; } pintar(); } }, "‹"),
+        el("strong", { class: "cal__mes", "aria-live": "polite" }, `${MESES[mes][0].toUpperCase()}${MESES[mes].slice(1)} ${anio}`),
+        el("button", { type: "button", class: "icon-btn", "aria-label": "Mes siguiente", disabled: !mesSiguienteOk, onclick: () => { mes++; if (mes > 11) { mes = 0; anio++; } pintar(); } }, "›")),
+      el("div", { class: "cal__sem", "aria-hidden": "true" }, SEMANA_LUN.map((d) => el("span", {}, DIAS_ABREV[d].slice(0, 1)))),
+      el("div", { class: "cal__grid" }, celdas),
+    );
+
+    const fechas = todas();
+    lista.replaceChildren(
+      el("p", { class: "field__hint", "aria-live": "polite", style: "margin:0" },
+        fechas.length ? `${fechas.length} ${fechas.length === 1 ? "fecha seleccionada" : "fechas seleccionadas"}:` : "Toca los días en que atiende. Aún no hay fechas seleccionadas."),
+      fechas.length ? el("div", { class: "chips cal__chips" },
+        fechas.map((f) => el("button", { type: "button", class: `chip${f < hoy ? " is-pasada" : ""}`, "aria-label": `Quitar ${DIAS_SEMANA[diaSemana(f)]} ${f.slice(8, 10)}/${f.slice(5, 7)}/${f.slice(0, 4)}`, onclick: () => alternar(f) },
+          `${DIAS_ABREV[diaSemana(f)]} ${f.slice(8, 10)}/${f.slice(5, 7)}/${f.slice(2, 4)} ✕`)),
+        el("button", { type: "button", class: "btn btn--ghost btn--sm", onclick: () => { elegidas.clear(); cambio(); } }, "Quitar todas")) : null,
+    );
+  }
+
+  pintar();
+  const contenedor = el("div", { class: "cal-wrap" }, raiz, lista);
+  contenedor.fechas = todas;
+  return contenedor;
 }

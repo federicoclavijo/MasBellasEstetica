@@ -4,7 +4,7 @@ import * as api from "./api.js";
 import { ApiError, sesion } from "./api.js";
 import {
   el, $, vaciar, toast, setCargando, abrirDialogo, confirmar, formatearMoneda, formatearFechaCorta, hoyISO, fotoPerfil, iniciales, normalizarTelefonoUY, formatearTelefonoUY, formatearCedulaUY,
-  DIAS_ABREV, DIAS_SEMANA, DIAS_POR_DEFECTO, diasDe, textoDias, sugerirFechas,
+  DIAS_ABREV, DIAS_SEMANA, DIAS_POR_DEFECTO, diasDe, textoDias, sugerirFechas, modoDe, fechasDe, textoDisponibilidad, crearCalendarioFechas,
 } from "./ui.js";
 
 const vistaLogin = $("#vista-login");
@@ -144,7 +144,8 @@ const badge = (v, etiquetas = ETIQUETA) => el("span", { class: `badge ${BADGE[v]
 function mostrarErrorForm(box, mensaje) { box.hidden = false; vaciar(box).append(el("div", { class: "notice notice--error" }, mensaje)); }
 const textoError = (error) => (error instanceof ApiError ? error.message : "No se pudo completar la operación.");
 
-const ORDEN_DIAS = [1, 2, 3, 4, 5, 6, 0]; // la semana se muestra de lunes a domingo
+const ORDEN_DIAS = [1, 2, 3, 4, 5, 6, 0];
+const sumarDiasISO = (fecha, dias) => { const [a, m, d] = fecha.split("-").map(Number); return new Date(Date.UTC(a, m - 1, d + dias)).toISOString().slice(0, 10); }; // la semana se muestra de lunes a domingo
 
 // Formulario genérico para alta y edición.
 //  - modo "crear": envía todos los campos completados.
@@ -174,6 +175,43 @@ function formulario({ titulo, modo, valores = {}, campos, textoGuardar, guardar 
             ORDEN_DIAS.map((d) => el("label", { class: "dia", title: DIAS_SEMANA[d] },
               el("input", { type: "checkbox", value: String(d), checked: marcados.has(d), "aria-label": DIAS_SEMANA[d] }),
               el("span", {}, DIAS_ABREV[d]))));
+        } else if (c.type === "disponibilidad") {
+          // Días de atención: UNA de dos modalidades a la vez — días de la semana (todas las semanas) o fechas puntuales (calendario).
+          const inicial = valores[c.name] ?? { tipo: "semanal", dias: DIAS_POR_DEFECTO, fechas: [] };
+          let tipo = inicial.tipo;
+          const marcados = new Set(inicial.dias);
+          const semana = el("div", { class: "dias-selector", role: "group", "aria-label": "Días de la semana en que atiende" },
+            ORDEN_DIAS.map((d) => el("label", { class: "dia", title: DIAS_SEMANA[d] },
+              el("input", { type: "checkbox", value: String(d), checked: marcados.has(d), "aria-label": DIAS_SEMANA[d] }),
+              el("span", {}, DIAS_ABREV[d]))));
+          const calendario = crearCalendarioFechas({ seleccionadas: inicial.fechas, desde: hoyISO(), hasta: sumarDiasISO(hoyISO(), 365) });
+          const panelSemana = el("div", { class: "disp__panel", id: `${id}-semanal`, role: "tabpanel" },
+            semana, el("p", { class: "field__hint" }, "Atiende estos días de la semana, todas las semanas."));
+          const panelFechas = el("div", { class: "disp__panel", id: `${id}-fechas`, role: "tabpanel" },
+            calendario, el("p", { class: "field__hint" }, "Atiende únicamente las fechas marcadas (útil si solo está disponible uno o dos días al mes)."));
+          const botones = {};
+          const elegir = (nuevo) => {
+            tipo = nuevo;
+            for (const [k, b] of Object.entries(botones)) { b.setAttribute("aria-checked", String(k === tipo)); b.tabIndex = k === tipo ? 0 : -1; b.classList.toggle("is-on", k === tipo); }
+            panelSemana.hidden = tipo !== "semanal";
+            panelFechas.hidden = tipo !== "fechas";
+          };
+          const modo$ = (k, texto, detalle) => (botones[k] = el("button", {
+            type: "button", role: "radio", class: "disp__modo", "aria-controls": `${id}-${k}`, onclick: () => elegir(k),
+            onkeydown: (ev) => { if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(ev.key)) { ev.preventDefault(); elegir(k === "semanal" ? "fechas" : "semanal"); botones[tipo].focus(); } },
+          }, el("strong", {}, texto), el("small", {}, detalle)));
+          control = el("div", { class: "disp", id, "aria-labelledby": `${id}-label` },
+            el("div", { class: "disp__modos", role: "radiogroup", "aria-labelledby": `${id}-label` },
+              modo$("semanal", "Días de la semana", "Ej.: todos los sábados"),
+              modo$("fechas", "Fechas puntuales", "Elegir días en un calendario")),
+            panelSemana, panelFechas);
+          elegir(tipo);
+          // Valor actual de la disponibilidad (solo la modalidad activa se aplica; la otra queda guardada).
+          control.leer = () => ({
+            tipo,
+            dias: [...semana.querySelectorAll("input:checked")].map((i) => Number(i.value)).sort((a, b) => a - b),
+            fechas: calendario.fechas(),
+          });
         } else if (c.type === "multi") {
           // Lista de casillas: el valor es un arreglo de ids.
           const marcados = new Set(valores[c.name] ?? []);
@@ -189,7 +227,7 @@ function formulario({ titulo, modo, valores = {}, campos, textoGuardar, guardar 
         controles[c.name] = control;
         return c.type === "checkbox"
           ? el("div", { class: "field" }, el("label", { class: "check", for: id }, control, c.label))
-          : el("div", { class: "field" }, el("label", { class: "field__label", id: `${id}-label`, for: c.type === "multi" || c.type === "dias" ? null : id }, c.label), control, c.hint ? el("p", { class: "field__hint" }, c.hint) : null);
+          : el("div", { class: "field" }, el("label", { class: "field__label", id: `${id}-label`, for: c.type === "multi" || c.type === "dias" || c.type === "disponibilidad" ? null : id }, c.label), control, c.hint ? el("p", { class: "field__hint" }, c.hint) : null);
       }),
       el("div", { class: "modal__acciones" },
         el("button", { type: "button", class: "btn btn--ghost", onclick: cerrar }, "Cancelar"),
@@ -219,6 +257,18 @@ function formulario({ titulo, modo, valores = {}, campos, textoGuardar, guardar 
           if (!dias.length) { mostrarErrorForm(errorBox, `«${c.label}»: elige al menos un día.`); return; }
           const antes = [...(valores[c.name] ?? DIAS_POR_DEFECTO)].sort((a, b) => a - b).join(",");
           if (modo === "crear" || dias.join(",") !== antes) datos[c.name] = dias;
+          continue;
+        }
+        if (c.type === "disponibilidad") {
+          const v = ctl.leer();
+          if (v.tipo === "semanal" && !v.dias.length) { mostrarErrorForm(errorBox, `«${c.label}»: elige al menos un día de la semana.`); return; }
+          if (v.tipo === "fechas" && !v.fechas.length) { mostrarErrorForm(errorBox, `«${c.label}»: elige al menos una fecha en el calendario.`); return; }
+          const o = valores[c.name] ?? { tipo: "semanal", dias: DIAS_POR_DEFECTO, fechas: [] };
+          const clave = (a) => [...a].sort().join(",");
+          if (modo === "crear" || v.tipo !== o.tipo) datos.tipoDisponibilidad = v.tipo;
+          // Con "fechas" activa los días de la semana no se usan: si no hay ninguno marcado simplemente no se envían.
+          if (v.dias.length && (modo === "crear" || clave(v.dias) !== clave(o.dias))) datos.diasDisponibles = v.dias;
+          if ((v.fechas.length || modo === "editar") && (modo === "crear" || clave(v.fechas) !== clave(o.fechas))) datos.fechasDisponibles = v.fechas;
           continue;
         }
         if (c.type === "multi") {
@@ -714,6 +764,15 @@ const eliminarReservaUI = (r) => accionConfirmada({
 // --- Especialistas ----------------------------------------------------------------------------------------
 const ROLES = [{ value: "Medico", label: "Médico" }, { value: "Cirujano", label: "Cirujano" }];
 
+// Próximas fechas puntuales de un especialista, como etiquetas (máximo 6 y "+N" si hay más).
+function pintarFechasPuntuales(e) {
+  const fechas = fechasDe(e);
+  if (!fechas.length) return el("span", { class: "badge badge--warn" }, "Sin fechas próximas");
+  return el("span", { class: "fechas-pills", role: "img", "aria-label": `Fechas de atención: ${textoDisponibilidad(e)}` },
+    fechas.slice(0, 6).map((f) => el("span", { class: "fecha-pill", "aria-hidden": "true" }, `${DIAS_ABREV[new Date(`${f}T00:00:00Z`).getUTCDay()]} ${f.slice(8, 10)}/${f.slice(5, 7)}`)),
+    fechas.length > 6 ? el("span", { class: "fecha-pill fecha-pill--mas", "aria-hidden": "true" }, `+${fechas.length - 6}`) : null);
+}
+
 function pintarEspecialistas() {
   vaciar(contenido).append(
     cabecera("Especialistas", `${estado.especialistas.length} en total`, { texto: "Nuevo especialista", onclick: nuevoEspecialistaUI }),
@@ -723,9 +782,11 @@ function pintarEspecialistas() {
             e.imagenPerfil ? el("img", { class: "avatar", src: fotoPerfil(e.imagenPerfil, 80), alt: `Foto de ${e.nombre}`, width: 80, height: 80, loading: "lazy", decoding: "async" }) : el("span", { class: "avatar", "aria-hidden": "true" }, iniciales(e.nombre)),
             el("div", {}, el("h2", {}, e.nombre), el("span", { class: "badge" }, ROLES.find((r) => r.value === e.rol)?.label || e.rol || "—"))),
           el("div", { class: "person__dias" },
-            el("small", { class: "sub" }, `Atiende: ${textoDias(diasDe(e))}`),
-            el("span", { class: "dias-pills", role: "img", "aria-label": `Días de atención: ${textoDias(diasDe(e))}` },
-              ORDEN_DIAS.map((d) => el("span", { class: `dia-pill${diasDe(e).includes(d) ? " is-on" : ""}`, "aria-hidden": "true", title: DIAS_SEMANA[d] }, DIAS_ABREV[d].slice(0, 1))))),
+            el("small", { class: "sub" }, modoDe(e) === "fechas" ? "Atiende solo en fechas puntuales" : `Atiende: ${textoDias(diasDe(e))}`),
+            modoDe(e) === "fechas"
+              ? pintarFechasPuntuales(e)
+              : el("span", { class: "dias-pills", role: "img", "aria-label": `Días de atención: ${textoDias(diasDe(e))}` },
+                ORDEN_DIAS.map((d) => el("span", { class: `dia-pill${diasDe(e).includes(d) ? " is-on" : ""}`, "aria-hidden": "true", title: DIAS_SEMANA[d] }, DIAS_ABREV[d].slice(0, 1))))),
           el("p", { class: "person__servicios" },
             el("small", { class: "sub" }, (e.servicios?.length ?? 0) === 0 ? "Sin servicios asignados" : `Servicios (${e.servicios.length})`),
             (e.servicios ?? []).length ? el("span", {}, e.servicios.map((x) => `${x.nombre} (${x.porcentaje === false ? "consulta" : "tratamiento"})`).join(" · ")) : null),
@@ -746,7 +807,7 @@ const opcionesServicios = (especialistaId) => estado.servicios.map((s) => {
 const camposEspecialista = (especialistaId) => [
   { name: "nombre", label: "Nombre", required: true, maxlength: 60 },
   { name: "rol", label: "Rol", type: "select", options: ROLES },
-  { name: "diasDisponibles", label: "Días de atención", type: "dias", hint: "Los clientes y el panel solo permiten reservar los días marcados. Puedes cambiarlos cuando quieras: las reservas ya hechas no se cancelan." },
+  { name: "disponibilidad", label: "Días de atención", type: "disponibilidad", hint: "Elige UNA modalidad: días de la semana o fechas puntuales. Los clientes y el panel solo permiten reservar esos días. Puedes cambiarlos cuando quieras: las reservas ya hechas no se cancelan." },
   { name: "serviciosIds", label: "Servicios a cargo", type: "multi", options: opcionesServicios(especialistaId) },
   { name: "imagen", label: "Foto de perfil", type: "file", hint: "Opcional. Máximo 5 MB." },
 ];
@@ -762,14 +823,14 @@ async function guardarConFoto(crearORegistrar, archivo) {
 
 const nuevoEspecialistaUI = () => formulario({
   titulo: "Nuevo especialista", modo: "crear", textoGuardar: "Crear especialista",
-  valores: { rol: "Medico", diasDisponibles: DIAS_POR_DEFECTO },
+  valores: { rol: "Medico", disponibilidad: { tipo: "semanal", dias: DIAS_POR_DEFECTO, fechas: [] } },
   campos: camposEspecialista(null),
   guardar: (datos, archivo) => guardarConFoto(async () => (await api.crearEspecialista(datos)).especialista._id, archivo),
 });
 
 const modificarEspecialistaUI = (e) => formulario({
   titulo: "Modificar especialista", modo: "editar",
-  valores: { ...e, diasDisponibles: diasDe(e), serviciosIds: estado.servicios.filter((s) => s.especialistaId === e._id).map((s) => s._id) },
+  valores: { ...e, disponibilidad: { tipo: modoDe(e), dias: diasDe(e), fechas: fechasDe(e) }, serviciosIds: estado.servicios.filter((s) => s.especialistaId === e._id).map((s) => s._id) },
   campos: camposEspecialista(e._id),
   guardar: (datos, archivo) => guardarConFoto(async () => {
     if (Object.keys(datos).length) {

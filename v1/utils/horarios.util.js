@@ -86,9 +86,29 @@ export const diasDeAtencion = (especialista) => {
     return Array.isArray(dias) ? [...new Set(dias)].sort((a, b) => a - b) : [...NEGOCIO.diasPorDefecto];
 };
 
+// Modalidad activa: "semanal" (días de la semana) o "fechas" (fechas puntuales). Los especialistas anteriores
+// a esta función no tienen el campo y atienden por días de la semana.
+export const modoDisponibilidad = (especialista) => (especialista?.tipoDisponibilidad === "fechas" ? "fechas" : "semanal");
+
+// Fechas puntuales cargadas (ordenadas, sin repetir). Solo se aplican si la modalidad activa es "fechas".
+export const fechasDeAtencion = (especialista) =>
+    Array.isArray(especialista?.fechasDisponibles) ? [...new Set(especialista.fechasDisponibles)].sort() : [];
+
 // ¿Atiende el especialista en esa fecha? Sin especialista no hay restricción que aplicar.
-export const atiendeEseDia = (especialista, fecha) =>
-    !especialista || diasDeAtencion(especialista).includes(diaSemana(fecha));
+// Solo cuenta la modalidad activa: o el día de la semana, o la fecha puntual (nunca las dos a la vez).
+export const atiendeEseDia = (especialista, fecha) => {
+    if (!especialista) return true;
+    return modoDisponibilidad(especialista) === "fechas"
+        ? fechasDeAtencion(especialista).includes(fecha)
+        : diasDeAtencion(especialista).includes(diaSemana(fecha));
+};
+
+// "2026-11-07" -> "07/11/2026"
+export const fechaLegible = (fecha) => `${fecha.slice(8, 10)}/${fecha.slice(5, 7)}/${fecha.slice(0, 4)}`;
+
+// Próximas fechas puntuales (desde `desde`, inclusive). Las pasadas no sirven para reservar.
+export const fechasProximas = (especialista, desde = ahoraNegocio().fecha) =>
+    fechasDeAtencion(especialista).filter((f) => f >= desde);
 
 // En español lunes a viernes no cambian en plural; sábado y domingo sí.
 const plural = (dia) => (dia === 0 || dia === 6 ? `${DIAS_SEMANA[dia]}s` : DIAS_SEMANA[dia]);
@@ -99,7 +119,24 @@ export const textoDias = (dias) => {
     return nombres.length > 1 ? `${nombres.slice(0, -1).join(", ")} y ${nombres.at(-1)}` : (nombres[0] ?? "ningún día");
 };
 
-// Mensaje cuando se pide una fecha en un día que el especialista no atiende.
-export const mensajeDiaNoAtendido = (especialista, fecha) =>
-    `${especialista.nombre} no atiende los ${plural(diaSemana(fecha))}. `
-    + `Atiende: ${textoDias(diasDeAtencion(especialista))}. Elige otra fecha.`;
+// Descripción corta de cuándo atiende: "los lunes y sábados" o "solo en fechas puntuales (07/11, 21/11…)".
+export const descripcionDisponibilidad = (especialista, desde = ahoraNegocio().fecha) => {
+    if (modoDisponibilidad(especialista) === "semanal") return `los ${textoDias(diasDeAtencion(especialista))}`;
+    const proximas = fechasProximas(especialista, desde);
+    if (!proximas.length) return "solo en fechas puntuales (por ahora no tiene fechas disponibles)";
+    const muestra = proximas.slice(0, 5).map((f) => fechaLegible(f).slice(0, 5)).join(", ");
+    return `solo en fechas puntuales (${muestra}${proximas.length > 5 ? ` y ${proximas.length - 5} más` : ""})`;
+};
+
+// Mensaje cuando se pide una fecha en la que el especialista no atiende.
+export const mensajeDiaNoAtendido = (especialista, fecha) => {
+    if (modoDisponibilidad(especialista) === "fechas") {
+        const proximas = fechasProximas(especialista);
+        return `${especialista.nombre} no atiende el ${fechaLegible(fecha)}. `
+            + (proximas.length
+                ? `Fechas disponibles: ${proximas.slice(0, 8).map(fechaLegible).join(", ")}${proximas.length > 8 ? "…" : ""}. Elige otra fecha.`
+                : "Por ahora no tiene fechas de atención disponibles.");
+    }
+    return `${especialista.nombre} no atiende los ${plural(diaSemana(fecha))}. `
+        + `Atiende: ${textoDias(diasDeAtencion(especialista))}. Elige otra fecha.`;
+};

@@ -219,6 +219,69 @@ test("nombres: una consulta y un tratamiento pueden llamarse igual, pero no hay 
     await M.Especialista.deleteMany({ nombre: "Temporal de nombres" });
 });
 
+test("fechas puntuales: un especialista puede atender solo días sueltos en vez de días de la semana (una modalidad a la vez)", { skip: omitir }, async () => {
+    const esp = (await admin("POST", "/especialistas", { nombre: "Dra. Fechas Sueltas", tipoDisponibilidad: "fechas", fechasDisponibles: [dias(10), dias(20)], diasDisponibles: [6] }));
+    assert.equal(esp.status, 201, JSON.stringify(esp.data));
+    const id = esp.data.especialista._id;
+    assert.equal(esp.data.especialista.tipoDisponibilidad, "fechas");
+    assert.deepEqual(esp.data.especialista.fechasDisponibles, [dias(10), dias(20)]);
+
+    // Validación
+    const crear = (extra) => admin("POST", "/especialistas", { nombre: "Dra. Inválida", ...extra });
+    assert.equal((await crear({ tipoDisponibilidad: "fechas" })).status, 400);                                         // modalidad fechas sin fechas
+    assert.equal((await crear({ tipoDisponibilidad: "fechas", fechasDisponibles: [dias(-3)] })).status, 400);          // solo fechas pasadas
+    assert.equal((await crear({ tipoDisponibilidad: "fechas", fechasDisponibles: ["2026-02-31"] })).status, 400);      // fecha que no existe
+    assert.equal((await crear({ tipoDisponibilidad: "fechas", fechasDisponibles: ["10/11/2030"] })).status, 400);      // formato
+    assert.equal((await crear({ tipoDisponibilidad: "fechas", fechasDisponibles: [dias(5), dias(5)] })).status, 400);  // repetidas
+    assert.equal((await crear({ tipoDisponibilidad: "mensual" })).status, 400);                                         // modalidad desconocida
+
+    const consulta = (await admin("POST", "/servicios", { nombre: "Consulta fechas", esConsulta: true, especialistaId: id })).data.servicio._id;
+    const disp = (fecha, usarAdmin = false) => (usarAdmin ? admin : api)("GET", `/reservas/disponibilidad?fecha=${fecha}&servicioId=${consulta}`);
+    let sabadoNoListado = 2; while (util.diaSemana(dias(sabadoNoListado)) !== 6 || [10, 20].includes(sabadoNoListado)) sabadoNoListado++;
+
+    // Solo valen sus fechas: ni otro día cualquiera ni un sábado (aunque tenga [6] guardado, la modalidad activa es "fechas")
+    assert.equal((await disp(dias(10))).data.atiendeEseDia, true);
+    assert.equal((await disp(dias(10))).data.horariosDisponibles.length, 24);
+    const fuera = (await disp(dias(11))).data;
+    assert.equal(fuera.atiendeEseDia, false);
+    assert.match(fuera.mensaje, /Dra\. Fechas Sueltas no atiende el .*Fechas disponibles:/);
+    assert.equal(fuera.tipoDisponibilidad, "fechas");
+    assert.deepEqual(fuera.fechasDisponibles, [dias(10), dias(20)]);
+    assert.equal((await disp(dias(sabadoNoListado))).data.atiendeEseDia, false);
+    assert.equal((await disp(dias(11), true)).data.atiendeEseDia, false);        // el panel usa la misma regla
+
+    // Reservar: el servidor lo impide fuera de sus fechas
+    const body = (fecha, extra = {}) => ({ ...datosCliente({ email: "fechas@correo.com" }), servicioId: consulta, fecha, hora: "10:00", ...extra });
+    const no = await api("POST", "/reservas", { body: body(dias(11)) });
+    assert.equal(no.status, 400); assert.match(no.data.mensaje, /no atiende el/);
+    assert.equal((await api("POST", "/reservas", { body: body(dias(10)) })).status, 201);
+
+    // Pasar a "semanal": las fechas quedan guardadas pero dejan de aplicarse; vale el día de la semana
+    const semanal = await admin("PATCH", `/especialistas/${id}`, { tipoDisponibilidad: "semanal" });
+    assert.equal(semanal.status, 200, JSON.stringify(semanal.data));
+    assert.equal(semanal.data.especialista.tipoDisponibilidad, "semanal");
+    assert.deepEqual(semanal.data.especialista.fechasDisponibles, [dias(10), dias(20)]);   // se conservan
+    assert.equal((await disp(dias(sabadoNoListado))).data.atiendeEseDia, true);             // ahora sí atiende sábados
+    assert.equal((await disp(dias(20))).data.atiendeEseDia, util.diaSemana(dias(20)) === 6); // su fecha suelta ya no cuenta
+
+    // Volver a "fechas" con otras fechas: avisa la reserva que quedó fuera de las nuevas fechas (no se cancela)
+    const vuelta = await admin("PATCH", `/especialistas/${id}`, { tipoDisponibilidad: "fechas", fechasDisponibles: [dias(30)] });
+    assert.equal(vuelta.status, 200, JSON.stringify(vuelta.data));
+    assert.deepEqual(vuelta.data.especialista.fechasDisponibles, [dias(30)]);
+    assert.equal(vuelta.data.reservasFueraDeDia, 1);
+    assert.equal((await disp(dias(30))).data.atiendeEseDia, true);
+    assert.equal((await disp(dias(10))).data.atiendeEseDia, false);
+
+    // Una modalidad "fechas" sin ninguna fecha vigente no se puede dejar guardada
+    assert.equal((await admin("PATCH", `/especialistas/${id}`, { fechasDisponibles: [] })).status, 400);
+    const otro = (await admin("POST", "/especialistas", { nombre: "Dr. Semanal Puro", diasDisponibles: [1] })).data.especialista._id;
+    assert.equal((await admin("PATCH", `/especialistas/${otro}`, { tipoDisponibilidad: "fechas" })).status, 400);  // no tiene fechas cargadas
+    const ok = await admin("PATCH", `/especialistas/${otro}`, { tipoDisponibilidad: "fechas", fechasDisponibles: [dias(7)] });
+    assert.equal(ok.status, 200);
+    assert.deepEqual(ok.data.especialista.diasDisponibles, [1]);                              // los días de la semana se conservan
+    assert.equal((await api("GET", "/especialistas")).data.especialistas.find((e) => e._id === otro).tipoDisponibilidad, "fechas");
+});
+
 test("antelación: el cliente no puede reservar con menos de 24 h; el administrador sí agenda sin ese margen", { skip: omitir }, async () => {
     const esp = (await admin("POST", "/especialistas", { nombre: "Temporal de antelación", diasDisponibles: [0, 1, 2, 3, 4, 5, 6] })).data.especialista._id;
     const consulta = (await admin("POST", "/servicios", { nombre: "Consulta antelación", esConsulta: true, especialistaId: esp })).data.servicio._id;

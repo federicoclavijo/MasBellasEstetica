@@ -6,7 +6,7 @@ import { crearError } from "../utils/http-error.util.js";
 import { esObjectIdValido } from "../utils/id.util.js";
 import {
     ahoraNegocio, sinAntelacionMinima, esFechaValida, esHoraValida, generarFranjas,
-    franjaYaPaso, hayCruce, sumarDias, diaSemana, diasDeAtencion, atiendeEseDia, mensajeDiaNoAtendido
+    franjaYaPaso, hayCruce, sumarDias, diaSemana, diasDeAtencion, atiendeEseDia, mensajeDiaNoAtendido, modoDisponibilidad, fechasProximas
 } from "../utils/horarios.util.js";
 import { calcularCobro, calcularCobroTratamiento, duracionDe, calcularReembolso, esConsulta } from "../utils/cobro.util.js";
 import { construirMensajeWhatsApp, urlWhatsApp } from "../utils/whatsapp.util.js";
@@ -99,6 +99,8 @@ const disponibilidadDelDia = async ({ especialista, especialistaId, fecha, durac
     const base = {
         especialistaNombre: especialista?.nombre ?? null,
         diasDisponibles: diasDeAtencion(especialista),
+        tipoDisponibilidad: modoDisponibilidad(especialista),
+        fechasDisponibles: fechasProximas(especialista),
     };
 
     if (!atiendeEseDia(especialista, fecha)) {
@@ -158,9 +160,9 @@ export const contarReservasFuturasActivas = async (filtro) => {
     return candidatas.filter((r) => !franjaYaPaso(r.fecha, r.hora, ahora)).length;
 };
 
-// Reservas futuras activas de un especialista que caen en un día de la semana que ya no atiende.
-// Sirve para avisar al cambiar sus días de atención (las reservas existentes no se tocan).
-export const contarReservasFueraDeDias = async (especialistaId, dias) => {
+// Reservas futuras activas de un especialista que caen en un día (o fecha) en que ya no atiende.
+// Sirve para avisar al cambiar su disponibilidad (las reservas existentes no se tocan).
+export const contarReservasFueraDeDias = async (especialistaId, especialista) => {
     const ahora = ahoraNegocio();
     const candidatas = await Reserva.find({
         especialistaId,
@@ -168,7 +170,7 @@ export const contarReservasFueraDeDias = async (especialistaId, dias) => {
         fecha: { $gte: ahora.fecha }
     }).select("fecha hora").lean();
 
-    return candidatas.filter((r) => !dias.includes(diaSemana(r.fecha)) && !franjaYaPaso(r.fecha, r.hora, ahora)).length;
+    return candidatas.filter((r) => !atiendeEseDia(especialista, r.fecha) && !franjaYaPaso(r.fecha, r.hora, ahora)).length;
 };
 
 // --- Cierre de reservas ---------------------------------------------------------------------------

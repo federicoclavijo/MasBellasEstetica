@@ -2,7 +2,7 @@
 import { crearReserva, listarServiciosPublico, listarEspecialistasPublico, obtenerDisponibilidad, ApiError } from "./api.js";
 import { STORAGE } from "./config.js";
 import {
-  el, $, vaciar, formatearMoneda, formatearFecha, formatearFechaCorta, hoyISO, fotoPerfil, primerDiaReservableISO, MIN_HORAS_ANTICIPACION, setCargando, iniciales, normalizarTelefonoUY, sugerirFechas, diasDe, textoDias,
+  el, $, vaciar, formatearMoneda, formatearFecha, formatearFechaCorta, hoyISO, fotoPerfil, primerDiaReservableISO, MIN_HORAS_ANTICIPACION, setCargando, iniciales, normalizarTelefonoUY, sugerirFechas, textoDisponibilidad,
 } from "./ui.js";
 
 const estado = {
@@ -107,7 +107,7 @@ function renderEquipo() {
       el("span", {},
         el("span", { class: "option__title" }, e.nombre),
         el("span", { class: "option__meta" }, [e.rol, aCargoDe.length ? aCargoDe.join(", ") : "Sin consultas por el momento"].filter(Boolean).join(" · ")),
-        el("span", { class: "option__meta" }, `Atiende: ${textoDias(diasDe(e))}`),
+        el("span", { class: "option__meta" }, `Atiende: ${textoDisponibilidad(e)}`),
         activo ? el("span", { class: "team__badge" }, "A cargo de tu consulta") : null)));
   }
   $("#hint-equipo").textContent = aCargo

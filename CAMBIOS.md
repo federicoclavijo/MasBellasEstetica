@@ -1,5 +1,31 @@
 # MasBellas · Servidor — Cambios realizados
 
+# Actualización 10 · Días de atención: días de la semana O fechas puntuales
+
+### Qué cambia
+- Cada especialista tiene ahora **dos modalidades** para definir cuándo atiende, y **solo una está activa a la vez**:
+  - **Días de la semana** (como antes): p. ej. todos los sábados.
+  - **Fechas puntuales**: se eligen a mano en un calendario (útil si solo está 1 o 2 días al mes).
+- Al cambiar de modalidad, lo cargado en la otra **se conserva pero no se aplica** (si volvés a «Días de la semana», tus días siguen ahí).
+- Aplica igual a la web de clientes, al alta de tratamientos y a la reprogramación del panel: la disponibilidad, las fechas sugeridas y el servidor usan la misma regla. Los especialistas existentes siguen atendiendo por días de la semana (no hay que migrar nada).
+
+### Panel → Especialistas
+- Formulario con selector de modalidad (dos opciones táctiles) y, según la elegida, los días de la semana o un **calendario mensual de selección múltiple** (hasta 1 año adelante, con las fechas elegidas como etiquetas que se pueden quitar una a una o todas juntas).
+- La tarjeta muestra «Atiende solo en fechas puntuales» con las próximas fechas (o los días de la semana, como antes).
+- Al cambiar la disponibilidad se avisa cuántas reservas futuras quedaron en un día en que ya no atiende (no se cancelan).
+
+### Formulario público
+- La tarjeta del especialista indica «Atiende: fechas puntuales (07/11, 21/11…)» y las fechas sugeridas muestran sus próximos días disponibles. Si elige otra fecha, el mensaje lista las que sí atiende.
+
+### Servidor
+- Especialista: `tipoDisponibilidad` (`"semanal"` | `"fechas"`, por defecto `"semanal"`) y `fechasDisponibles` (`["YYYY-MM-DD", …]`). Las fechas pasadas se descartan al guardar; con modalidad «fechas» hace falta al menos una fecha vigente (si no, 400).
+- La respuesta de disponibilidad incluye `tipoDisponibilidad` y `fechasDisponibles`.
+
+### Pruebas
+- `npm test` (14) pasa. Se agregó una prueba de integración de fechas puntuales (necesita `TEST_MONGO_URI`; no se pudo ejecutar en este entorno). El calendario y el formulario se probaron en Chromium (escritorio y móvil) con la API simulada.
+
+---
+
 # Actualización 9 · Botones, antelación de 24 h, fotos de especialistas y fotos de Nosotros
 
 ### Botones (hover)

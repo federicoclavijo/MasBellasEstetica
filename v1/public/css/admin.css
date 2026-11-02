@@ -141,5 +141,48 @@ table.data { width: 100%; border-collapse: collapse; }
 }
 .dia-pill.is-on { background: var(--gold-soft); color: var(--gold-deep); border-color: var(--gold-line); }
 
+/* Modalidad de atención: días de la semana O fechas puntuales (calendario) */
+.disp { display: grid; gap: .8rem; }
+.disp__modos { display: grid; grid-template-columns: 1fr; gap: .5rem; }
+@media (min-width: 30rem) { .disp__modos { grid-template-columns: 1fr 1fr; } }
+.disp__modo {
+  display: flex; flex-direction: column; gap: .1rem; align-items: flex-start; text-align: left; min-height: 3.2rem; padding: .6rem .9rem;
+  border: 1.5px solid var(--line); border-radius: var(--radius-sm); background-color: var(--ivory); color: var(--ink); cursor: pointer;
+  transition: border-color .2s ease, background-color .2s ease, box-shadow .2s ease;
+}
+.disp__modo small { color: var(--muted); font-size: .82rem; }
+.disp__modo:hover { border-color: var(--rose-dusty); }
+.disp__modo:focus-visible { outline: 3px solid color-mix(in srgb, var(--rose-strong) 55%, white); outline-offset: 2px; }
+.disp__modo.is-on { border-color: var(--rose-strong); background-color: var(--blush); box-shadow: 0 0 0 3px rgba(185, 74, 114, .12); }
+.disp__panel { display: grid; gap: .5rem; }
+.disp__panel[hidden] { display: none; }
+
+/* Calendario de selección de fechas */
+.cal-wrap { display: grid; gap: .7rem; }
+.cal { width: 100%; max-width: 23rem; padding: .7rem; border: 1px solid var(--line); border-radius: var(--radius-sm); background-color: var(--ivory); }
+.cal__nav { display: flex; align-items: center; justify-content: space-between; gap: .5rem; margin-bottom: .4rem; }
+.cal__nav .icon-btn { font-size: 1.4rem; line-height: 1; }
+.cal__nav .icon-btn:disabled { opacity: .3; cursor: not-allowed; transform: none; }
+.cal__mes { font-family: var(--font-display, inherit); font-size: 1.05rem; text-align: center; }
+.cal__sem, .cal__grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: .2rem; }
+.cal__sem span { text-align: center; font-size: .75rem; font-weight: 700; color: var(--muted); padding-bottom: .2rem; }
+.cal__dia {
+  aspect-ratio: 1; min-height: 2.4rem; display: grid; place-items: center; border-radius: 50%; border: 1.5px solid transparent;
+  background-color: rgba(255, 255, 255, 0); color: var(--ink); font-weight: 600; font-size: .9rem; cursor: pointer;
+  transition: background-color .2s ease, border-color .2s ease, color .2s ease, transform .2s ease;
+}
+.cal__dia:hover:not(:disabled) { border-color: var(--rose-dusty); transform: translateY(-1px); }
+.cal__dia:focus-visible { outline: 3px solid color-mix(in srgb, var(--rose-strong) 55%, white); outline-offset: 1px; }
+.cal__dia.is-hoy { border-color: var(--gold); }
+.cal__dia.is-on { background-color: var(--rose-strong); border-color: var(--rose-strong); color: #fff; }
+.cal__dia:disabled { opacity: .3; cursor: not-allowed; }
+.cal__sel { display: grid; gap: .4rem; }
+.cal__chips { align-items: center; }
+
+/* Fechas puntuales en la tarjeta del especialista */
+.fechas-pills { display: flex; flex-wrap: wrap; gap: .3rem; }
+.fecha-pill { padding: .15rem .6rem; border-radius: 999px; font-size: .78rem; font-weight: 600; background: var(--gold-soft); color: var(--gold-deep); border: 1px solid var(--gold-line); }
+.fecha-pill--mas { background: var(--beige); color: var(--muted); border-color: var(--line); }
+
 /* Botones de las filas: ya heredan la elevación de .btn; en móvil (sin hover real) no se mueve nada */
-@media (prefers-reduced-motion: reduce) { .dia:hover span, .cliente:hover { transform: none; } }
+@media (prefers-reduced-motion: reduce) { .dia:hover span, .cliente:hover, .cal__dia:hover:not(:disabled) { transform: none; } }

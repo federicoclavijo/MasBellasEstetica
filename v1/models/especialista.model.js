@@ -14,6 +14,19 @@ const especialistaSchema = new Schema({
             message: "Los días de atención deben ser entre 0 (domingo) y 6 (sábado) y haber al menos uno",
         },
     },
+    // Cómo se definen los días de atención. SOLO UNA de las dos modalidades está activa a la vez:
+    //  - "semanal": atiende los días de la semana de `diasDisponibles` (p. ej. todos los sábados).
+    //  - "fechas":  atiende únicamente las fechas puntuales de `fechasDisponibles` (p. ej. un día al mes).
+    // Al cambiar de modalidad se conserva lo cargado en la otra, pero no se aplica.
+    tipoDisponibilidad: { type: String, enum: ["semanal", "fechas"], default: "semanal" },
+    fechasDisponibles: {
+        type: [String], // "YYYY-MM-DD"
+        default: [],
+        validate: {
+            validator: (fechas) => fechas.every((f) => /^\d{4}-\d{2}-\d{2}$/.test(f)),
+            message: "Las fechas de atención deben tener formato YYYY-MM-DD",
+        },
+    },
     rol: { type: String, enum: ["Medico", "Cirujano"], default: "Medico", required: true }
 }, {
     versionKey: false,
