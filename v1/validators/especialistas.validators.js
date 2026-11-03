@@ -32,9 +32,14 @@ const fechasDisponibles = Joi.array()
         "array.max": "Se pueden cargar hasta 366 fechas de atención",
     });
 
+// Duración de sus consultas, en minutos: 30 o 60.
+const duracionConsultaMinutos = Joi.number().valid(30, 60).label("La duración de las consultas")
+    .messages({ "any.only": "La duración de las consultas debe ser de 30 o 60 minutos", "number.base": "La duración de las consultas debe ser de 30 o 60 minutos" });
+
 export const agregarEspecialistaSchema = Joi.object({
     nombre: nombre.required(),
     rol: rol.default("Medico"),
+    duracionConsultaMinutos,
     diasDisponibles,
     tipoDisponibilidad,
     fechasDisponibles,
@@ -44,6 +49,7 @@ export const agregarEspecialistaSchema = Joi.object({
 export const actualizarEspecialistaSchema = Joi.object({
     nombre,
     rol,
+    duracionConsultaMinutos,
     diasDisponibles,
     tipoDisponibilidad,
     fechasDisponibles,

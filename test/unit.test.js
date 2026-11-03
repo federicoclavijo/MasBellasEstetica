@@ -123,7 +123,7 @@ test("correo de confirmación: consulta y tratamiento, con datos escapados", () 
     const base = { _id: "abc123", nombre: "<i>Lucía</i> Pérez", servicioNombre: "Limpieza", especialistaNombre: "Dra. Ana", fecha: "2030-03-05", hora: "10:00", duracionMinutos: 60, precioTotal: 3000, montoSena: 1500, porcentajeSena: 50, tipo: "tratamiento" };
     const t = construirCorreoConfirmacion(base);
     assert.match(t.asunto, /confirmada/i);
-    for (const trozo of ["Valor del tratamiento: $3.000", "Seña abonada: $1.500", "Resta abonar en el local: $1.500", "Martes, 5 de marzo de 2030", "10:00 hs (60 min)", "abc123"]) assert.ok(t.texto.includes(trozo), trozo);
+    for (const trozo of ["Valor del tratamiento: $3.000", "Seña abonada: $1.500", "Resta abonar en el local: $1.500", "Martes, 5 de marzo de 2030", "10:00 hs (1 hora)", "abc123"]) assert.ok(t.texto.includes(trozo), trozo);
     assert.ok(!t.html.includes("<i>") && t.html.includes("&lt;i&gt;"), "el HTML escapa el contenido del cliente");
 
     const c = construirCorreoConfirmacion({ ...base, tipo: "consulta", precioTotal: 500, montoSena: 500, porcentajeSena: 100, duracionMinutos: 30 });
@@ -186,4 +186,21 @@ test("días de atención: solo una modalidad a la vez (días de la semana O fech
     assert.equal(u.descripcionDisponibilidad(fechas, "2099-01-01"), "solo en fechas puntuales (04/11, 18/11)");
     assert.match(u.descripcionDisponibilidad({ ...fechas, fechasDisponibles: [] }), /por ahora no tiene fechas/);
     assert.equal(u.mensajeDiaNoAtendido(fechas, "2099-11-07"), "Dra. Ana no atiende el 07/11/2099. Fechas disponibles: 04/11/2099, 18/11/2099. Elige otra fecha.");
+});
+
+test("duración de la consulta: 30 min por defecto o 1 hora según el especialista; el tratamiento siempre 1 hora", async () => {
+    const { duracionDe, duracionConsultaDe } = await import("../v1/utils/cobro.util.js");
+    const { generarFranjas } = await import("../v1/utils/horarios.util.js");
+    const consulta = { porcentaje: false }, tratamiento = { porcentaje: true };
+    assert.equal(duracionConsultaDe(undefined), 30);
+    assert.equal(duracionConsultaDe({}), 30);
+    assert.equal(duracionConsultaDe({ duracionConsultaMinutos: 30 }), 30);
+    assert.equal(duracionConsultaDe({ duracionConsultaMinutos: 60 }), 60);
+    assert.equal(duracionConsultaDe({ duracionConsultaMinutos: 45 }), 30);          // valor no permitido -> por defecto
+    assert.equal(duracionDe(consulta), 30);
+    assert.equal(duracionDe(consulta, { duracionConsultaMinutos: 60 }), 60);
+    assert.equal(duracionDe(tratamiento, { duracionConsultaMinutos: 30 }), 60);      // el tratamiento no depende del especialista
+    // Los horarios ofrecidos cambian con la duración: cada 30 min (24 turnos) o cada hora (12 turnos)
+    assert.equal(generarFranjas(30).length, 24);
+    assert.deepEqual(generarFranjas(60), ["08:00", "09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00", "18:00", "19:00"]);
 });

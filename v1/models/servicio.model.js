@@ -8,7 +8,7 @@ const servicioSchema = new Schema({
     // Consulta: siempre $500 (lo fija el servidor). Tratamiento: precio de referencia OPCIONAL; el importe real
     // lo define el administrador en cada reserva, porque varía según el cliente.
     precio: { type: Number, min: 1, default: null },
-    // false -> CONSULTA: valor fijo de $500, turnos cada 30 min. Es lo ÚNICO que reserva el cliente en la web.
+    // false -> CONSULTA: valor fijo de $500, turnos de 30 min o 1 h (según el especialista). Es lo ÚNICO que reserva el cliente en la web.
     // true  -> TRATAMIENTO: lo reserva el administrador (seña del 50 %, turnos de 1 hora).
     porcentaje: { type: Boolean, default: true },
     // Cada servicio tiene UN especialista a cargo (un especialista puede tener varios servicios).
@@ -28,7 +28,9 @@ servicioSchema.index({ nombre: 1, porcentaje: 1 }, { unique: true, collation: { 
 
 // Datos calculados por el servidor (así el frontend no duplica las reglas de negocio).
 servicioSchema.virtual("esConsulta").get(function () { return esConsulta(this); });
-servicioSchema.virtual("duracionMinutos").get(function () { return duracionDe(this); });
+// La duración de una consulta depende del especialista que la atiende. Los servicios se envían con el especialista
+// ya cargado en `$locals` (ver conDuracion() en servicios.services.js); sin él se asume la duración por defecto.
+servicioSchema.virtual("duracionMinutos").get(function () { return duracionDe(this, this.$locals?.especialista); });
 servicioSchema.virtual("porcentajeSena").get(function () { return calcularCobro(this).porcentajeSena; });
 servicioSchema.virtual("montoSena").get(function () { return calcularCobro(this).montoSena; });
 

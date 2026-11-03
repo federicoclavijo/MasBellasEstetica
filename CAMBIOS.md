@@ -1,5 +1,25 @@
 # MasBellas · Servidor — Cambios realizados
 
+# Actualización 11 · Consultas de 1 hora por especialista
+
+### Cómo se resolvió (y por qué a nivel de especialista)
+- La duración de la consulta se configura **en el especialista** («Duración de las consultas»: 30 minutos o 1 hora, 30 por defecto), no servicio por servicio. Así se define una sola vez y vale para todas sus consultas (las actuales y las que le asignes después); no hay que acordarse de crear una «consulta de 1 hora» aparte. Podés tener cuantos especialistas de 30 min o de 1 hora quieras.
+- Los **tratamientos siempre duran 1 hora**, sin cambios.
+
+### Qué cambia según la duración
+- **Horarios disponibles:** con 1 hora los turnos son cada hora (08:00, 09:00 … 19:00); con 30 min, cada media hora, como hasta ahora. El servidor valida el horario con la duración del especialista y la reserva guarda la duración con la que se tomó (por eso al cambiar la configuración las reservas ya hechas no se ven afectadas y los cruces se siguen controlando bien).
+- **Cliente (formulario):** la tarjeta de cada especialista dice «Consultas de 1 hora» (resaltado) o «Consultas de 30 minutos»; la lista de consultas muestra «Valor fijo · 1 h»; al elegir una consulta se indica «Sus consultas duran 1 hora» y el texto de los horarios explica el paso; el resumen suma la fila «Duración».
+- **Textos:** inicio y Términos ya no dicen que todas duran 30 minutos; los correos de confirmación muestran «(1 hora)» o «(30 min)»; la página de resultado del pago aclara «(1 hora)».
+- **Panel:** nuevo campo «Duración de las consultas» en el formulario del especialista (con aclaración), la tarjeta muestra la duración, la tabla de Servicios indica «Consulta · 1 h / 30 min» según el especialista y la de Reservas muestra la hora con su duración.
+
+### Servidor
+- Especialista: `duracionConsultaMinutos` (30 | 60, por defecto 30; otros valores → 400). El servicio expone `duracionMinutos` ya calculada con su especialista (`GET /servicios`, disponibilidad y alta de reservas). No hace falta migrar nada: todos los especialistas existentes quedan en 30 min; para el que atiende 1 hora, editalo desde el panel.
+
+### Pruebas
+- `npm test` (15) pasa. Se agregó una prueba de integración (necesita `TEST_MONGO_URI`; no se pudo ejecutar acá) con ambos tipos de especialista, cambio de duración y cruces. El formulario público y el panel se probaron en Chromium con la API simulada.
+
+---
+
 # Actualización 10 · Días de atención: días de la semana O fechas puntuales
 
 ### Qué cambia

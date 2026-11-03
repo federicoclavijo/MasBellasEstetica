@@ -43,7 +43,7 @@ function pintar(clave, reserva) {
     el("p", {}, v.texto),
     reserva?.fecha
       ? el("p", { style: "margin-top:.6rem;font-weight:600;color:var(--ink)" },
-          [reserva.servicioNombre, `${formatearFecha(reserva.fecha)} · ${reserva.hora}`].filter(Boolean).join(" — "))
+          [reserva.servicioNombre, `${formatearFecha(reserva.fecha)} · ${reserva.hora}${reserva.duracionMinutos === 60 ? " (1 hora)" : ""}`].filter(Boolean).join(" — "))
       : null,
     clave === "aprobado" && reserva?.montoSena != null
       ? el("p", { style: "margin-top:.3rem" }, `Importe abonado: ${formatearMoneda(reserva.montoSena)}`) : null,

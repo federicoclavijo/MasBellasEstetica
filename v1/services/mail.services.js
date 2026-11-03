@@ -56,6 +56,8 @@ const moneda = (n) => `$${Number(n).toLocaleString("es-UY", { minimumFractionDig
 const fechaLarga = (fecha) =>
     new Intl.DateTimeFormat("es-UY", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "UTC" })
         .format(new Date(`${fecha}T00:00:00Z`));
+// 30 -> "30 min", 60 -> "1 hora"
+const duracionLegible = (min = 60) => (min === 60 ? "1 hora" : `${min} min`);
 const mayuscula = (t) => t.charAt(0).toUpperCase() + t.slice(1);
 
 export const construirCorreoConfirmacion = (reserva) => {
@@ -68,7 +70,7 @@ export const construirCorreoConfirmacion = (reserva) => {
         [esTratamiento ? "Tratamiento" : "Consulta", reserva.servicioNombre ?? (esTratamiento ? "Tratamiento" : "Consulta")],
         ...(reserva.especialistaNombre ? [["Especialista", reserva.especialistaNombre]] : []),
         ["Fecha", mayuscula(fechaLarga(reserva.fecha))],
-        ["Hora", `${reserva.hora} hs (${reserva.duracionMinutos ?? 60} min)`],
+        ["Hora", `${reserva.hora} hs (${duracionLegible(reserva.duracionMinutos)})`],
         ...(esTratamiento
             ? [["Valor del tratamiento", moneda(reserva.precioTotal)], ["Seña abonada", moneda(reserva.montoSena)], ["Resta abonar en el local", moneda(saldo)]]
             : [["Valor de la consulta abonado", moneda(reserva.montoSena)]]),
@@ -145,7 +147,7 @@ export const construirCorreoAdmin = (reserva) => {
         ...(reserva.telefono ? [["Teléfono", reserva.telefono]] : []),
         [esTratamiento ? "Tratamiento" : "Consulta", reserva.servicioNombre ?? (esTratamiento ? "Tratamiento" : "Consulta")],
         ...(reserva.especialistaNombre ? [["Especialista", reserva.especialistaNombre]] : []),
-        ["Fecha y hora", `${mayuscula(fechaLarga(reserva.fecha))}, ${reserva.hora} hs (${reserva.duracionMinutos ?? 60} min)`],
+        ["Fecha y hora", `${mayuscula(fechaLarga(reserva.fecha))}, ${reserva.hora} hs (${duracionLegible(reserva.duracionMinutos)})`],
         ...(esTratamiento
             ? [["Valor del tratamiento", moneda(reserva.precioTotal)], ["Seña abonada", moneda(reserva.montoSena)], ["Resta cobrar en el local", moneda(saldo)]]
             : [["Importe abonado", moneda(reserva.montoSena)]]),

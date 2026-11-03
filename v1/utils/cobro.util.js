@@ -1,11 +1,18 @@
 import { NEGOCIO } from "../config/negocio.config.js";
 
 // Convención del modelo: `porcentaje: true`  -> servicio convencional (seña del 50 %, turnos de 1 h)
-//                        `porcentaje: false` -> servicio de CONSULTA (valor fijo, turnos de 30 min)
+//                        `porcentaje: false` -> servicio de CONSULTA (valor fijo, turnos de 30 min o 1 h según el especialista)
 export const esConsulta = (servicio) => servicio.porcentaje === false;
 
-export const duracionDe = (servicio) =>
-    esConsulta(servicio) ? NEGOCIO.consulta.duracionMinutos : NEGOCIO.duracionEstandarMinutos;
+// Duración de las consultas de un especialista: 30 min (por defecto) o 60 min si así está configurado.
+export const duracionConsultaDe = (especialista) =>
+    NEGOCIO.consulta.duracionesPermitidas.includes(especialista?.duracionConsultaMinutos)
+        ? especialista.duracionConsultaMinutos
+        : NEGOCIO.consulta.duracionMinutos;
+
+// Duración del turno: la consulta depende del especialista que la atiende; el tratamiento siempre dura 1 hora.
+export const duracionDe = (servicio, especialista) =>
+    esConsulta(servicio) ? duracionConsultaDe(especialista) : NEGOCIO.duracionEstandarMinutos;
 
 // Cuánto se cobra online al reservar.
 export const calcularCobro = (servicio) => {

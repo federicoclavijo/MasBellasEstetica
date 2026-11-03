@@ -179,6 +179,8 @@ table.data { width: 100%; border-collapse: collapse; }
 .cal__sel { display: grid; gap: .4rem; }
 .cal__chips { align-items: center; }
 
+.sub--dur { color: var(--gold-deep); font-weight: 600; }
+
 /* Fechas puntuales en la tarjeta del especialista */
 .fechas-pills { display: flex; flex-wrap: wrap; gap: .3rem; }
 .fecha-pill { padding: .15rem .6rem; border-radius: 999px; font-size: .78rem; font-weight: 600; background: var(--gold-soft); color: var(--gold-deep); border: 1px solid var(--gold-line); }

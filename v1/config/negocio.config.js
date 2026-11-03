@@ -22,8 +22,9 @@ export const NEGOCIO = Object.freeze({
     senaPorcentaje: 50,
     duracionEstandarMinutos: 60,
 
-    // Servicio de consulta: valor fijo (se cobra completo) y turnos cada media hora.
-    consulta: Object.freeze({ precio: 500, duracionMinutos: 30 }),
+    // Servicio de consulta: valor fijo (se cobra completo). Dura 30 minutos por defecto; cada especialista puede
+    // atender sus consultas en turnos de 1 hora (campo `duracionConsultaMinutos` del especialista).
+    consulta: Object.freeze({ precio: 500, duracionMinutos: 30, duracionesPermitidas: Object.freeze([30, 60]) }),
 
     // Tiempo que se retiene el horario mientras el cliente paga en Mercado Pago (consulta reservada por la web).
     reservaTtlMinutos: entero(process.env.RESERVA_TTL_MINUTOS, 15),

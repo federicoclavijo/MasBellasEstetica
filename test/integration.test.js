@@ -282,6 +282,56 @@ test("fechas puntuales: un especialista puede atender solo días sueltos en vez 
     assert.equal((await api("GET", "/especialistas")).data.especialistas.find((e) => e._id === otro).tipoDisponibilidad, "fechas");
 });
 
+test("duración: un especialista puede atender consultas de 1 hora y otro de 30 min, configurable desde el panel", { skip: omitir }, async () => {
+    // Validación
+    assert.equal((await admin("POST", "/especialistas", { nombre: "Dra. Duración inválida", duracionConsultaMinutos: 45 })).status, 400);
+    const larga = (await admin("POST", "/especialistas", { nombre: "Dra. Una Hora", duracionConsultaMinutos: 60, diasDisponibles: [0, 1, 2, 3, 4, 5, 6] })).data.especialista;
+    const corta = (await admin("POST", "/especialistas", { nombre: "Dr. Media Hora", diasDisponibles: [0, 1, 2, 3, 4, 5, 6] })).data.especialista;
+    assert.equal(larga.duracionConsultaMinutos, 60);
+    assert.equal(corta.duracionConsultaMinutos, 30);                       // por defecto
+
+    const nuevaConsulta = async (nombre, esp) => (await admin("POST", "/servicios", { nombre, esConsulta: true, especialistaId: esp._id })).data.servicio;
+    const sLarga = await nuevaConsulta("Consulta de una hora", larga);
+    const sCorta = await nuevaConsulta("Consulta de media hora", corta);
+    assert.equal(sLarga.duracionMinutos, 60);                              // el servicio informa la duración de su especialista
+    assert.equal(sCorta.duracionMinutos, 30);
+    const publicos = (await api("GET", "/servicios")).data.servicios;
+    assert.equal(publicos.find((s) => s._id === sLarga._id).duracionMinutos, 60);
+    assert.equal(publicos.find((s) => s._id === sCorta._id).duracionMinutos, 30);
+
+    // Horarios disponibles: cada hora (12) o cada 30 min (24)
+    const disp = async (s, f) => (await api("GET", `/reservas/disponibilidad?fecha=${f}&servicioId=${s._id}`)).data;
+    const f = dias(5);
+    const dL = await disp(sLarga, f), dC = await disp(sCorta, f);
+    assert.equal(dL.duracionMinutos, 60);
+    assert.equal(dL.horariosDisponibles.length, 12);
+    assert.ok(!dL.horariosDisponibles.includes("09:30"));
+    assert.equal(dC.duracionMinutos, 30);
+    assert.equal(dC.horariosDisponibles.length, 24);
+
+    // Reservar: la de 1 hora no acepta turnos de media hora; la reserva guarda su duración y bloquea la hora completa
+    const body = (s, hora, mail) => ({ ...datosCliente({ email: mail }), servicioId: s._id, fecha: f, hora });
+    assert.equal((await api("POST", "/reservas", { body: body(sLarga, "09:30", "dur1@correo.com") })).status, 400);
+    const r = await api("POST", "/reservas", { body: body(sLarga, "09:00", "dur2@correo.com") });
+    assert.equal(r.status, 201, JSON.stringify(r.data));
+    assert.equal(r.data.reserva.duracionMinutos, 60);
+    assert.ok(!(await disp(sLarga, f)).horariosDisponibles.includes("09:00"));
+    assert.equal((await api("POST", "/reservas", { body: body(sCorta, "09:30", "dur3@correo.com") })).status, 201);   // la de 30 min sigue igual
+    assert.equal((await disp(sCorta, f)).horariosOcupados.includes("09:30"), true);
+
+    // Cambiar la duración desde el panel: afecta los horarios nuevos y conserva las reservas ya tomadas
+    const cambio = await admin("PATCH", `/especialistas/${corta._id}`, { duracionConsultaMinutos: 60 });
+    assert.equal(cambio.status, 200, JSON.stringify(cambio.data));
+    assert.equal(cambio.data.especialista.duracionConsultaMinutos, 60);
+    const dC2 = await disp(sCorta, f);
+    assert.equal(dC2.duracionMinutos, 60);
+    assert.equal(dC2.horariosDisponibles.length, 11);                      // 12 turnos menos el de las 09:00, que pisa la reserva de 09:30 (de 30 min)
+    assert.ok(!dC2.horariosDisponibles.includes("09:00"));
+    assert.ok(dC2.horariosDisponibles.includes("10:00"));
+    assert.equal((await api("GET", "/servicios")).data.servicios.find((s) => s._id === sCorta._id).duracionMinutos, 60);
+    assert.equal((await admin("PATCH", `/especialistas/${corta._id}`, { duracionConsultaMinutos: 90 })).status, 400);
+});
+
 test("antelación: el cliente no puede reservar con menos de 24 h; el administrador sí agenda sin ese margen", { skip: omitir }, async () => {
     const esp = (await admin("POST", "/especialistas", { nombre: "Temporal de antelación", diasDisponibles: [0, 1, 2, 3, 4, 5, 6] })).data.especialista._id;
     const consulta = (await admin("POST", "/servicios", { nombre: "Consulta antelación", esConsulta: true, especialistaId: esp })).data.servicio._id;

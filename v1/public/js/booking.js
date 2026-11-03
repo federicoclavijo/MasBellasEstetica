@@ -2,7 +2,7 @@
 import { crearReserva, listarServiciosPublico, listarEspecialistasPublico, obtenerDisponibilidad, ApiError } from "./api.js";
 import { STORAGE } from "./config.js";
 import {
-  el, $, vaciar, formatearMoneda, formatearFecha, formatearFechaCorta, hoyISO, fotoPerfil, primerDiaReservableISO, MIN_HORAS_ANTICIPACION, setCargando, iniciales, normalizarTelefonoUY, sugerirFechas, textoDisponibilidad,
+  el, $, vaciar, formatearMoneda, formatearFecha, formatearFechaCorta, hoyISO, fotoPerfil, primerDiaReservableISO, MIN_HORAS_ANTICIPACION, setCargando, iniciales, normalizarTelefonoUY, sugerirFechas, textoDisponibilidad, duracionTexto,
 } from "./ui.js";
 
 const estado = {
@@ -23,9 +23,8 @@ const especialistaElegido = () => {
   const servicio = servicioElegido();
   return servicio ? estado.especialistas.find((e) => e._id === servicio.especialistaId) ?? null : null;
 };
-const duracionTexto = (min) => (min === 30 ? "30 min" : "1 h");
-// Todas las consultas valen lo mismo (valor fijo) y duran 30 minutos.
-const detalleCobro = (s) => `Valor fijo · ${duracionTexto(s.duracionMinutos)}`;
+// Todas las consultas valen lo mismo (valor fijo). Duran 30 minutos o 1 hora según el especialista que las atiende.
+const detalleCobro = (s) => `Valor fijo · ${duracionTexto(s.duracionMinutos, true)}`;
 
 
 // --- Carga de catálogo ---------------------------------------------------------------
@@ -108,10 +107,11 @@ function renderEquipo() {
         el("span", { class: "option__title" }, e.nombre),
         el("span", { class: "option__meta" }, [e.rol, aCargoDe.length ? aCargoDe.join(", ") : "Sin consultas por el momento"].filter(Boolean).join(" · ")),
         el("span", { class: "option__meta" }, `Atiende: ${textoDisponibilidad(e)}`),
+        el("span", { class: `team__dur${e.duracionConsultaMinutos === 60 ? " is-larga" : ""}` }, `Consultas de ${duracionTexto(e.duracionConsultaMinutos ?? 30)}`),
         activo ? el("span", { class: "team__badge" }, "A cargo de tu consulta") : null)));
   }
   $("#hint-equipo").textContent = aCargo
-    ? `${aCargo.nombre} estará a cargo de «${servicioElegido().nombre}».`
+    ? `${aCargo.nombre} estará a cargo de «${servicioElegido().nombre}». Sus consultas duran ${duracionTexto(servicioElegido().duracionMinutos)}.`
     : "Cada consulta está a cargo de un especialista. Al elegir el tipo de consulta verás quién te atenderá.";
 }
 
@@ -178,7 +178,7 @@ async function cargarDisponibilidad() {
 
   const servicio = servicioElegido();
   $("#hint-horario").textContent = servicio
-    ? `Atendemos de 08:00 a 20:00. Los turnos de consulta son cada ${servicio.duracionMinutos === 30 ? "30 minutos" : "hora"}. Elige un único horario.`
+    ? `Atendemos de 08:00 a 20:00. La consulta con ${especialistaElegido()?.nombre ?? "el especialista"} dura ${duracionTexto(servicio.duracionMinutos)}, por eso los turnos son cada ${servicio.duracionMinutos === 60 ? "hora" : "30 minutos"}. Elige un único horario.`
     : "Atendemos de 08:00 a 20:00. Elige un único horario.";
 
   if (!fecha || !servicioId || fecha < primerDiaReservableISO()) {
@@ -228,6 +228,7 @@ function actualizarResumen() {
   valorResumen("especialista", especialista?.nombre);
   valorResumen("fecha", form.elements.fecha.value ? formatearFecha(form.elements.fecha.value) : "");
   valorResumen("hora", estado.hora);
+  valorResumen("duracion", servicio ? duracionTexto(servicio.duracionMinutos) : "");
 
   // El importe lo calcula el servidor: las consultas tienen un valor fijo que se abona completo al reservar.
   $("#r-sena").textContent = servicio ? formatearMoneda(servicio.montoSena) : "—";

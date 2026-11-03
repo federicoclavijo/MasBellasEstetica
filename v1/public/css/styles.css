@@ -263,6 +263,8 @@ a { color: var(--rose-strong); }
 }
 .team__card.is-dim { opacity: .55; }
 .team__card.is-active { border-color: var(--rose-strong); background: var(--blush); box-shadow: 0 0 0 3px rgba(185, 74, 114, .14); opacity: 1; }
+.team__dur { display: block; margin-top: .15rem; font-size: .82rem; color: var(--muted); }
+.team__dur.is-larga { color: var(--gold-deep); font-weight: 600; }
 .team__badge {
   display: inline-block; margin-top: .3rem; padding: .1rem .55rem; border-radius: 999px;
   background: var(--rose-strong); color: #fff; font-size: .74rem; font-weight: 600;

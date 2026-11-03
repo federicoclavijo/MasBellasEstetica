@@ -4,7 +4,7 @@ import * as api from "./api.js";
 import { ApiError, sesion } from "./api.js";
 import {
   el, $, vaciar, toast, setCargando, abrirDialogo, confirmar, formatearMoneda, formatearFechaCorta, hoyISO, fotoPerfil, iniciales, normalizarTelefonoUY, formatearTelefonoUY, formatearCedulaUY,
-  DIAS_ABREV, DIAS_SEMANA, DIAS_POR_DEFECTO, diasDe, textoDias, sugerirFechas, modoDe, fechasDe, textoDisponibilidad, crearCalendarioFechas,
+  DIAS_ABREV, DIAS_SEMANA, DIAS_POR_DEFECTO, diasDe, textoDias, sugerirFechas, modoDe, fechasDe, textoDisponibilidad, crearCalendarioFechas, duracionTexto,
 } from "./ui.js";
 
 const vistaLogin = $("#vista-login");
@@ -398,7 +398,7 @@ function pintarReservas() {
           r.telefono ? el("small", { class: "sub sub--dato" }, formatearTelefonoUY(r.telefono)) : null),
         el("span", {}, el("strong", {}, servicioDe(r)),
           el("small", { class: "sub" }, `${tipoDe(r) === "tratamiento" ? "Tratamiento" : "Consulta"} · ${especialistaDe(r)}`)),
-        el("span", { class: "nowrap" }, formatearFechaCorta(r.fecha), el("small", { class: "sub" }, `${r.hora} hs`)),
+        el("span", { class: "nowrap" }, formatearFechaCorta(r.fecha), el("small", { class: "sub" }, `${r.hora} hs · ${duracionTexto(r.duracionMinutos ?? 60, true)}`)),
         celdaImporte(r),
         el("div", { class: "estado" }, badge(r.estadoReserva),
           asistenciaDe(r) ? el("span", { class: `badge ${BADGE_ASISTENCIA[asistenciaDe(r)]}` }, ETIQUETA_ASISTENCIA[asistenciaDe(r)]) : null,
@@ -782,6 +782,7 @@ function pintarEspecialistas() {
             e.imagenPerfil ? el("img", { class: "avatar", src: fotoPerfil(e.imagenPerfil, 80), alt: `Foto de ${e.nombre}`, width: 80, height: 80, loading: "lazy", decoding: "async" }) : el("span", { class: "avatar", "aria-hidden": "true" }, iniciales(e.nombre)),
             el("div", {}, el("h2", {}, e.nombre), el("span", { class: "badge" }, ROLES.find((r) => r.value === e.rol)?.label || e.rol || "—"))),
           el("div", { class: "person__dias" },
+            el("small", { class: `sub${e.duracionConsultaMinutos === 60 ? " sub--dur" : ""}` }, `Consultas de ${duracionTexto(e.duracionConsultaMinutos ?? 30)}`),
             el("small", { class: "sub" }, modoDe(e) === "fechas" ? "Atiende solo en fechas puntuales" : `Atiende: ${textoDias(diasDe(e))}`),
             modoDe(e) === "fechas"
               ? pintarFechasPuntuales(e)
@@ -807,6 +808,9 @@ const opcionesServicios = (especialistaId) => estado.servicios.map((s) => {
 const camposEspecialista = (especialistaId) => [
   { name: "nombre", label: "Nombre", required: true, maxlength: 60 },
   { name: "rol", label: "Rol", type: "select", options: ROLES },
+  { name: "duracionConsultaMinutos", label: "Duración de las consultas", type: "select", parse: (v) => Number(v),
+    options: [{ value: "30", label: "30 minutos (turnos cada media hora)" }, { value: "60", label: "1 hora (turnos cada hora)" }],
+    hint: "Aplica a todas las consultas de este especialista y se informa al cliente al reservar. Los tratamientos siempre duran 1 hora. Las reservas ya tomadas conservan su duración." },
   { name: "disponibilidad", label: "Días de atención", type: "disponibilidad", hint: "Elige UNA modalidad: días de la semana o fechas puntuales. Los clientes y el panel solo permiten reservar esos días. Puedes cambiarlos cuando quieras: las reservas ya hechas no se cancelan." },
   { name: "serviciosIds", label: "Servicios a cargo", type: "multi", options: opcionesServicios(especialistaId) },
   { name: "imagen", label: "Foto de perfil", type: "file", hint: "Opcional. Máximo 5 MB." },
@@ -823,7 +827,7 @@ async function guardarConFoto(crearORegistrar, archivo) {
 
 const nuevoEspecialistaUI = () => formulario({
   titulo: "Nuevo especialista", modo: "crear", textoGuardar: "Crear especialista",
-  valores: { rol: "Medico", disponibilidad: { tipo: "semanal", dias: DIAS_POR_DEFECTO, fechas: [] } },
+  valores: { rol: "Medico", duracionConsultaMinutos: 30, disponibilidad: { tipo: "semanal", dias: DIAS_POR_DEFECTO, fechas: [] } },
   campos: camposEspecialista(null),
   guardar: (datos, archivo) => guardarConFoto(async () => (await api.crearEspecialista(datos)).especialista._id, archivo),
 });
@@ -879,7 +883,7 @@ function pintarServicios() {
     vaciar(lista).append(tabla(["Servicio", "Tipo y precio", "Cobro al reservar", "Especialista", "Estado", "Acciones"],
       filas.map((s) => [
         el("strong", {}, s.nombre),
-        el("span", {}, s.esConsulta ? "Consulta · 30 min" : "Tratamiento · 1 h",
+        el("span", {}, s.esConsulta ? `Consulta · ${duracionTexto(s.duracionMinutos ?? 30, true)}` : "Tratamiento · 1 h",
           el("small", { class: "sub" }, s.esConsulta ? formatearMoneda(s.precio) : (s.precio ? `Referencia ${formatearMoneda(s.precio)}` : "Precio a medida"))),
         s.esConsulta ? `${formatearMoneda(s.montoSena)} (valor fijo, lo reserva el cliente)` : `Seña ${s.porcentajeSena} % del precio acordado (lo agenda el administrador)`,
         nombreDe(estado.especialistas, s.especialistaId) || el("span", { class: "badge badge--warn" }, "Sin asignar"),
@@ -914,7 +918,7 @@ const camposServicio = (servicioActual) => [
   {
     name: "esConsulta", label: "Tipo de servicio", type: "select", parse: (v) => v === "true",
     options: [
-      { value: "true", label: "Consulta — la reserva el cliente en la web ($500 fijos, turnos de 30 min)" },
+      { value: "true", label: "Consulta — la reserva el cliente en la web ($500 fijos, turnos de 30 min o 1 h según el especialista)" },
       { value: "false", label: "Tratamiento — lo agenda el administrador (seña del 50 %, turnos de 1 hora)" },
     ],
     onChange: (ctl, c) => {

@@ -43,6 +43,9 @@ export const hoyISO = () => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 };
 
+// Duración de un turno: 30 -> "30 minutos", 60 -> "1 hora". `corto` -> "30 min" / "1 h".
+export const duracionTexto = (min, corto = false) => (min === 60 ? (corto ? "1 h" : "1 hora") : (corto ? `${min} min` : `${min} minutos`));
+
 // Antelación mínima para que un cliente reserve online (debe coincidir con RESERVA_MIN_HORAS del servidor, 24 por defecto).
 export const MIN_HORAS_ANTICIPACION = 24;
 // Primer día que ofrece reservas online: el turno más cercano posible es "ahora + 24 h", o sea, mañana.

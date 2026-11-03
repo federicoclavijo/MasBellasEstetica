@@ -47,11 +47,22 @@ const exigirSinReservasFuturas = async (servicio, accion, sugerencia = "") => {
     }
 };
 
+// La duración de una consulta depende de su especialista: se lo adjunta a cada servicio (en `$locals`, no se guarda)
+// para que la respuesta incluya la `duracionMinutos` correcta. Acepta un servicio o una lista.
+const conDuracion = async (servicios) => {
+    const lista = Array.isArray(servicios) ? servicios : [servicios];
+    const ids = [...new Set(lista.map((s) => s.especialistaId).filter(Boolean).map(String))];
+    const especialistas = ids.length ? await Especialista.find({ _id: { $in: ids } }).select("duracionConsultaMinutos") : [];
+    const porId = new Map(especialistas.map((e) => [String(e._id), e]));
+    for (const s of lista) s.$locals.especialista = s.especialistaId ? porId.get(String(s.especialistaId)) : null;
+    return servicios;
+};
+
 // Público: solo las CONSULTAS activas (lo único que el cliente puede reservar en la web).
 // Administración (incluirInactivos): todos los servicios, tratamientos incluidos.
 export const obtenerServiciosService = async ({ incluirInactivos = false } = {}) => {
     const filtro = incluirInactivos ? {} : { activo: true, porcentaje: false };
-    return Servicio.find(filtro).sort({ nombre: 1 });
+    return conDuracion(await Servicio.find(filtro).sort({ nombre: 1 }));
 };
 
 export const obtenerServicioPorIdService = async (id) => {
@@ -63,7 +74,7 @@ export const obtenerServicioPorIdService = async (id) => {
         throw crearError(404, "No se encontró un servicio con ese ID");
     }
 
-    return servicio;
+    return conDuracion(servicio);
 };
 
 export const guardarServicioService = async ({ nombre, precio, activo = true, esConsulta = false, especialistaId = null }) => {
@@ -75,13 +86,13 @@ export const guardarServicioService = async ({ nombre, precio, activo = true, es
 
     const especialista = especialistaId ? await obtenerEspecialistaExistente(especialistaId) : null;
 
-    return Servicio.create({
+    return conDuracion(await Servicio.create({
         nombre,
         precio: precioFinal({ consulta: esConsulta, precio }),
         porcentaje: !esConsulta,
         activo,
         especialistaId: especialista?._id ?? null
-    });
+    }));
 };
 
 export const actualizarServicioService = async (id, cambios) => {
@@ -125,7 +136,7 @@ export const actualizarServicioService = async (id, cambios) => {
 
     await servicio.save();
 
-    return servicio;
+    return conDuracion(servicio);
 };
 
 // Lado "especialista" de la relación: deja a `especialistaId` a cargo exactamente de `serviciosIds`.

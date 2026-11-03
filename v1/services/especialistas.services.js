@@ -47,7 +47,7 @@ export const obtenerEspecialistaPorIdService = async (id, { incluirInactivos = t
     return especialista;
 };
 
-export const guardarEspecialistaService = async ({ nombre, rol, diasDisponibles, tipoDisponibilidad = "semanal", fechasDisponibles, serviciosIds }) => {
+export const guardarEspecialistaService = async ({ nombre, rol, duracionConsultaMinutos, diasDisponibles, tipoDisponibilidad = "semanal", fechasDisponibles, serviciosIds }) => {
     nombre = nombre.trim();
 
     // Una sola modalidad a la vez: con "fechas" tiene que haber al menos una fecha que todavía no haya pasado.
@@ -60,6 +60,7 @@ export const guardarEspecialistaService = async ({ nombre, rol, diasDisponibles,
 
     const especialista = await Especialista.create({
         nombre, rol, tipoDisponibilidad, fechasDisponibles: fechas,
+        ...(duracionConsultaMinutos ? { duracionConsultaMinutos } : {}),
         ...(diasDisponibles ? { diasDisponibles: [...diasDisponibles].sort((a, b) => a - b) } : {}),
     });
 
@@ -88,6 +89,9 @@ export const actualizarEspecialistaService = async (id, cambios) => {
     }
 
     if (cambios.rol !== undefined) especialista.rol = cambios.rol;
+
+    // Duración de sus consultas (30 o 60 min). Las reservas ya tomadas conservan su duración; solo cambian los horarios nuevos.
+    if (cambios.duracionConsultaMinutos !== undefined) especialista.duracionConsultaMinutos = cambios.duracionConsultaMinutos;
 
     if (cambios.diasDisponibles !== undefined) {
         especialista.diasDisponibles = [...cambios.diasDisponibles].sort((a, b) => a - b);

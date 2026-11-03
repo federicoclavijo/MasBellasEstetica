@@ -295,7 +295,7 @@ export const obtenerDisponibilidadService = async (fecha, servicioId, { admin = 
         throw crearError(409, "El servicio no tiene un especialista asignado en este momento");
     }
 
-    const duracion = duracionDe(servicio);
+    const duracion = duracionDe(servicio, especialista);
 
     return {
         fecha,
@@ -344,8 +344,8 @@ export const guardarReservaService = async (nuevaReserva) => {
         throw crearError(409, "El servicio no tiene un especialista asignado en este momento");
     }
 
-    // 2. Horario válido según la duración del servicio (30 min la consulta, 60 min el resto).
-    const duracion = duracionDe(servicio);
+    // 2. Horario válido según la duración del turno (la consulta: 30 o 60 min según el especialista; el tratamiento: 60 min).
+    const duracion = duracionDe(servicio, especialista);
     validarTurno({ fecha, hora, duracion, especialista, aplicarAntelacion: true });
 
     // 3. Liberar lo vencido y lo propio pendiente, y comprobar que el horario siga libre.
@@ -456,7 +456,7 @@ export const crearReservaAdminService = async (datos) => {
         throw crearError(409, "El tratamiento no tiene un especialista asignado. Asígnalo desde Servicios");
     }
 
-    const duracion = duracionDe(servicio);
+    const duracion = duracionDe(servicio, especialista);
     validarTurno({ fecha, hora, duracion, especialista });
 
     await expirarReservasPendientesService({ especialistaId: especialista._id, fecha });

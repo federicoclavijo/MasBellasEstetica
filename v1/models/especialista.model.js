@@ -14,6 +14,9 @@ const especialistaSchema = new Schema({
             message: "Los días de atención deben ser entre 0 (domingo) y 6 (sábado) y haber al menos uno",
         },
     },
+    // Duración de las CONSULTAS que atiende este especialista: 30 min (por defecto) o 60 min. Aplica a todas sus
+    // consultas; los tratamientos siempre duran 1 hora. Las reservas ya hechas conservan la duración con la que se tomaron.
+    duracionConsultaMinutos: { type: Number, enum: [30, 60], default: 30 },
     // Cómo se definen los días de atención. SOLO UNA de las dos modalidades está activa a la vez:
     //  - "semanal": atiende los días de la semana de `diasDisponibles` (p. ej. todos los sábados).
     //  - "fechas":  atiende únicamente las fechas puntuales de `fechasDisponibles` (p. ej. un día al mes).
